@@ -39,6 +39,11 @@ def create_turn_label(root):
 
 
 def create_board_canvas(root):
-    canvas = tk.Canvas(root, width=800, height=600, bg="white")
+    width, height = 1600, 800  # キャンバスサイズ
+    background_color = "white"  # 背景色
+    canvas = tk.Canvas(root, width=width, height=height, bg=background_color)
     canvas.pack(fill="both", expand=True)
-    return canvas, 30, 9, 12  # radius, rows, cols
+    radius = 45  # タイルサイズ
+    rows = 9  # 行数
+    cols = 12  # 列数
+    return canvas, radius, rows, cols
