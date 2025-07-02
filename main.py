@@ -1,6 +1,8 @@
+import os
 import random
 import tkinter as tk
 from tkinter import messagebox
+
 from core.board_loader import load_blocks, assemble_board
 from core.map_loader import load_map_configs
 from core.data_loader import load_book_orders, load_generic_hints, load_map_player_hints
@@ -9,22 +11,23 @@ from ui.utils import load_terrain_images, create_turn_label, create_board_canvas
 from ui.dialogs import ask_player_selection
 from ui.labels import display_name, INTERNAL_LABELS
 from handlers.canvas_handler import setup_canvas_bindings
+from ui.board_view import create_hex_board  # ← 背景対応版を使用
 
 
 def main():
     players = 4
 
+    # --- マップ選択（ランダム） ---
     maps = load_map_configs("assets/configs")
     valid_map_ids = list(maps.keys())
-    map_id = random.choice(valid_map_ids)  # ← 毎回ランダムなマップを選ぶ
-    print(f"[INFO] 使用マップID → {map_id}")  # デバッグ出力
+    map_id = random.choice(valid_map_ids)
+    print(f"[INFO] 使用マップID → {map_id}")
 
     player_ids = INTERNAL_LABELS[:players]
     game_state = GameState(player_ids)
 
-    # データ読み込みと盤面構築
+    # --- データロード ---
     blocks = load_blocks("assets/blocks")
-    maps = load_map_configs("assets/configs")
     hints_def = load_generic_hints("assets/configs")
     book_orders = load_book_orders("assets/configs")
     mp_hints = load_map_player_hints("assets/configs")
@@ -36,6 +39,7 @@ def main():
     used_labels = [label for label in label_order if mp_row.get(label)]
     selected_labels = used_labels[:players]
 
+    # --- ヒント構築 ---
     hints = []
     for pid, label in zip(player_ids, selected_labels):
         pos = mp_row[label]
@@ -43,16 +47,13 @@ def main():
         hint = next(h for h in hints_def if h["hint_id"] == hint_id)
         hints.append(hint)
 
+    # --- 盤面構築 ---
     board_data = assemble_board(blocks, map_info["blocks"], 2, 3)
-    # デバッグ用（main.py の初期化後などに）
-    for coord, cell in board_data.items():
-        if cell is None:
-            print(f"警告: board_data に None が含まれています → {coord}")
 
-    for (col, row), cell in board_data.items():
+    for coord, cell in board_data.items():
         cell.update({
-            "col": col,
-            "row": row,
+            "col": coord[0],
+            "row": coord[1],
             "cube": None,
             "discs": [],
             "structure": None,
@@ -68,14 +69,24 @@ def main():
             board_data[key]["structure"] = s["type"]
             board_data[key]["structure_color"] = s["color"]
 
-    # GUI構築
+    # --- GUI構築 ---
     root = tk.Tk()
     root.title("Cryptid Offline")
     turn_label = create_turn_label(root)
     terrain_imgs = load_terrain_images("assets/terrain")
     canvas, radius, rows, cols = create_board_canvas(root)
 
-    # --- アクションボタンの追加 ---
+    # --- 背景画像のランダム選択 ---
+    bg_img = None
+    bg_dir = "assets/backgrounds"
+    bg_files = [f for f in os.listdir(
+        bg_dir) if f.lower().endswith((".png", ".gif"))]
+    if bg_files:
+        bg_path = os.path.join(bg_dir, random.choice(bg_files))
+        print(f"[INFO] 背景画像 → {bg_path}")
+        bg_img = tk.PhotoImage(file=bg_path)
+
+    # --- アクションボタン ---
     action_frame = tk.Frame(root)
     action_frame.pack(side="bottom", fill="x")
 
@@ -83,7 +94,6 @@ def main():
         if game_state.current_action in ("place_cube", "place_disc", "reveal_check"):
             messagebox.showinfo("操作無効", "現在のフェーズを完了してください。")
             return
-        # 再選択可能に：別の行動に上書きする
         game_state.current_action = "question"
         turn_label.config(
             text=f"{display_name(game_state.current_player)} のターン（行動: 質問）")
@@ -92,7 +102,6 @@ def main():
         if game_state.current_action in ("place_cube", "place_disc", "reveal_check"):
             messagebox.showinfo("操作無効", "現在のフェーズを完了してください。")
             return
-        # 質問 → 探索 の切り替えを許容する（自由再選択）
         game_state.begin_search()
         turn_label.config(
             text=f"{display_name(game_state.current_player)} のターン（行動: 探索）")
@@ -102,12 +111,14 @@ def main():
     tk.Button(action_frame, text="探索する", command=begin_search).pack(
         side="left", padx=10)
 
+    # --- イベント登録と初期描画 ---
     setup_canvas_bindings(canvas, board_data, hints, player_ids, game_state,
                           radius, rows, cols, terrain_imgs, root, turn_label)
 
     turn_label.config(text=f"{display_name(game_state.current_player)} のターン")
-    from ui.board_view import create_hex_board
-    create_hex_board(canvas, board_data, rows, cols, radius, terrain_imgs)
+    create_hex_board(canvas, board_data, rows, cols, radius,
+                     terrain_imgs, background_img=bg_img)
+
     root.mainloop()
 
 
