@@ -1,3 +1,4 @@
+import random
 import tkinter as tk
 from tkinter import messagebox
 from core.board_loader import load_blocks, assemble_board
@@ -11,7 +12,13 @@ from handlers.canvas_handler import setup_canvas_bindings
 
 
 def main():
-    map_id, players = 10, 5
+    players = 4
+
+    maps = load_map_configs("assets/configs")
+    valid_map_ids = list(maps.keys())
+    map_id = random.choice(valid_map_ids)  # ← 毎回ランダムなマップを選ぶ
+    print(f"[INFO] 使用マップID → {map_id}")  # デバッグ出力
+
     player_ids = INTERNAL_LABELS[:players]
     game_state = GameState(player_ids)
 
@@ -43,13 +50,23 @@ def main():
             print(f"警告: board_data に None が含まれています → {coord}")
 
     for (col, row), cell in board_data.items():
-        cell.update({"col": col, "row": row, "cube": None, "discs": []})
+        cell.update({
+            "col": col,
+            "row": row,
+            "cube": None,
+            "discs": [],
+            "structure": None,
+            "structure_color": None,
+        })
+        for t in cell.get("territories", []):
+            if t in ("bear", "eagle"):
+                cell["zone_marker"] = t
+
     for s in map_info.get("structures", []):
-        if (s["col"], s["row"]) in board_data:
-            board_data[(s["col"], s["row"])].update({
-                "structure": s["type"],
-                "structure_color": s["color"]
-            })
+        key = (s["col"], s["row"])
+        if key in board_data:
+            board_data[key]["structure"] = s["type"]
+            board_data[key]["structure_color"] = s["color"]
 
     # GUI構築
     root = tk.Tk()

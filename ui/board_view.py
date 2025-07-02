@@ -1,5 +1,3 @@
-# ui/board_view.py
-
 import math
 
 
@@ -10,24 +8,21 @@ def grid_to_pixel(col, row, radius):
 
 
 def pixel_to_grid(x, y, radius):
-    # 左上のオフセット補正（grid_to_pixel と一致）
     x -= radius + 10
     y -= radius + 10
-
     col = int(round(x / (1.5 * radius)))
     col_offset = 0.5 * radius * math.sqrt(3) if col % 2 else 0
     row = int(round((y - col_offset) / (radius * math.sqrt(3))))
-
     return col, row
 
 
 def cube_color(player_id):
     colors = {
-        "alpha": "#E74C3C",    # 赤
-        "beta": "#3498DB",     # 青
-        "gamma": "#2ECC71",    # 緑
-        "delta": "#F1C40F",    # 黄
-        "epsilon": "#9B59B6"   # 紫
+        "alpha": "#E74C3C",
+        "beta": "#3498DB",
+        "gamma": "#2ECC71",
+        "delta": "#F1C40F",
+        "epsilon": "#9B59B6"
     }
     return colors.get(player_id, "gray")
 
@@ -43,55 +38,63 @@ def create_hex_board(canvas, board_data, rows, cols, radius, terrain_imgs):
         if terrain in terrain_imgs:
             canvas.create_image(cx, cy, image=terrain_imgs[terrain])
 
-        # 六角形枠線（任意）
-        points = []
+        # 🐾 縄張りの描画（zone_marker に基づく）
+        zone = cell.get("zone_marker")
+        if zone in ("bear", "eagle"):
+            points = []
+            for i in range(6):
+                angle = math.radians(60 * i)
+                px = cx + radius * 0.75 * math.cos(angle)
+                py = cy + radius * 0.75 * math.sin(angle)
+                points.extend([px, py])
+            if zone == "bear":
+                canvas.create_polygon(
+                    points, outline="black", fill="", width=2, dash=(4, 2)
+                )
+            elif zone == "eagle":
+                canvas.create_polygon(
+                    points, outline="red", fill="", width=2
+                )
+
+        # 六角形の枠線
+        hex_points = []
         for i in range(6):
             angle = math.radians(60 * i)
             px = cx + radius * math.cos(angle)
             py = cy + radius * math.sin(angle)
-            points.extend([px, py])
-        canvas.create_polygon(points, outline="gray", fill="", width=1)
+            hex_points.extend([px, py])
+        canvas.create_polygon(hex_points, outline="gray", fill="", width=1)
 
-        # 構造物（構造物が None のときも安全に処理）
+        # 構造物（stone/ruin）
         structure = cell.get("structure")
-        if isinstance(structure, str) and structure:
+        if structure in ("stone", "ruin"):
             color = cell.get("structure_color", "gray")
-
+            shape = []
             if structure == "stone":
-                # 正八角形
-                points = []
                 for i in range(8):
                     angle = math.radians(45 * i)
                     px = cx + radius * 0.5 * math.cos(angle)
                     py = cy + radius * 0.5 * math.sin(angle)
-                    points.extend([px, py])
-                canvas.create_polygon(points, fill=color,
-                                      outline="black", width=2)
-
+                    shape.extend([px, py])
             elif structure == "ruin":
-                # 上向き正三角形
-                points = []
                 for i in range(3):
                     angle = math.radians(120 * i - 90)
                     px = cx + radius * 0.6 * math.cos(angle)
                     py = cy + radius * 0.6 * math.sin(angle)
-                    points.extend([px, py])
-                canvas.create_polygon(points, fill=color,
-                                      outline="black", width=2)
+                    shape.extend([px, py])
+            canvas.create_polygon(shape, fill=color, outline="black", width=2)
 
-        # キューブ（中央に四角）
+        # キューブ（中央の四角）
         cube_owner = cell.get("cube")
         if cube_owner:
             color = cube_color(cube_owner)
-            print(
-                f"[キューブ描画] マス({col}, {row}) → cube_owner={cube_owner}, color={color}")
             canvas.create_rectangle(
                 cx - radius * 0.35, cy - radius * 0.35,
                 cx + radius * 0.35, cy + radius * 0.35,
                 fill=color, outline="black", width=1
             )
 
-        # ディスク（下部に複数並列）
+        # ディスク（下部に並列）
         discs = cell.get("discs", [])
         for i, pid in enumerate(discs):
             offset = (i - len(discs) / 2 + 0.5) * radius * 0.3

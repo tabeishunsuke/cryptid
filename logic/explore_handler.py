@@ -61,9 +61,26 @@ def begin_reveal_sequence(coord, cell, current, player_ids, board_data, hints,
     print(f"[反証順序] → {', '.join(display_name(p) for p in reveal_order)}")
 
     def reveal_step():
+        nonlocal coord
         idx = game_state.reveal_index
         if idx >= len(reveal_order):
             print(f"[探索成功] 全員合致 → {display_name(explorer)} 勝利")
+            print("\n[🔍 正解マス探索]")
+            correct_coords = []
+            for test_coord, test_cell in board_data.items():
+                all_match = all(hint_applies_to_cell(test_cell, hints[player_ids.index(pid)], board_data)
+                                for pid in player_ids)
+                if all_match:
+                    correct_coords.append(test_coord)
+
+            for coord in correct_coords:
+                print(f"✅ 正解座標: {coord}")
+
+            print("\n[🧩 各プレイヤーのヒント]")
+            for pid in player_ids:
+                hint = hints[player_ids.index(pid)]
+                print(f"{display_name(pid)} → {hint['text']}")
+
             messagebox.showinfo(
                 "ゲーム終了", f"{display_name(explorer)} の勝利！おめでとう！")
             root.quit()
