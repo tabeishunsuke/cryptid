@@ -1,4 +1,4 @@
-from ui.utils import pixel_to_grid
+from ui.utils import is_point_in_hex, pixel_to_grid
 from ui.dialogs import ask_player_selection
 from ui.labels import display_name
 from core.hint_engine import hint_applies_to_cell
@@ -8,10 +8,24 @@ import tkinter.messagebox as messagebox
 
 def handle_canvas_click(event, canvas, board_data, hints, player_ids, game_state,
                         radius, rows, cols, terrain_imgs, root, turn_label):
-    col, row = pixel_to_grid(event.x, event.y, radius)
-    coord = (col, row)
+    center_col, center_row = pixel_to_grid(event.x, event.y, radius, canvas)
+    coord = None
+
+    # 周辺8セル + 中心 を調査（最大9セル）
+    for dc in [-1, 0, 1]:
+        for dr in [-1, 0, 1]:
+            nc = center_col + dc
+            nr = center_row + dr
+            if (nc, nr) in board_data:
+                if is_point_in_hex(event.x, event.y, nc, nr, radius, canvas):
+                    coord = (nc, nr)
+                    break
+        if coord:
+            break
+
     print(
-        f"クリック位置: pixel=({event.x}, {event.y}) → grid={coord} → 有効？ {coord in board_data}")
+        f"クリック位置: pixel=({event.x}, {event.y}) → 推定grid=({center_col}, {center_row}) → 確定grid={coord} → 有効？ {coord in board_data}"
+    )
 
     if coord not in board_data:
         return

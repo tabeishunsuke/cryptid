@@ -35,6 +35,8 @@ def create_hex_board(canvas, board_data, rows, cols, radius, terrain_imgs, backg
     offset_y = (canvas_height - board_height) / 2 - radius * \
         math.sqrt(3) * (min_row + 0.5 * (min_col % 2)) + radius
 
+    canvas.hex_offset = (offset_x, offset_y)
+
     for (col, row), cell in board_data.items():
         cx = radius * 3 / 2 * col + offset_x
         cy = radius * math.sqrt(3) * (row + 0.5 * (col % 2)) + offset_y
