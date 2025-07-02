@@ -1,134 +1,88 @@
-import os
 import tkinter as tk
-
-# --- 外部モジュールの読み込み ---
 from core.board_loader import load_blocks, assemble_board
-from core.map_loader import load_map_configs, select_random_map
-from core.data_loader import (
-    load_book_orders,
-    load_generic_hints,
-    load_map_player_hints
-)
-from core.hint_engine import apply_hint
-from ui.board_view import (
-    create_hex_board,
-    grid_to_pixel,
-    hex_corners
-)
-
-# --- 定数設定 ---
-BLOCK_DIR = "assets/blocks"
-CONFIG_DIR = "assets/configs"
-IMAGE_DIR = "assets/terrain"
-BLOCK_COLS = 2
-BLOCK_ROWS = 3
+from core.map_loader import load_map_configs
+from core.data_loader import load_book_orders, load_generic_hints, load_map_player_hints
+from core.hint_engine import hint_applies_to_cell
+from core.game_state import GameState
+from ui.utils import load_terrain_images, create_turn_label, create_board_canvas
+from ui.dialogs import ask_player_selection
+from ui.labels import display_name, INTERNAL_LABELS
+from handlers.canvas_handler import setup_canvas_bindings
 
 
 def main():
-    # 1. マップ・ヒント・冊子定義などのデータ読み込み
-    blocks = load_blocks(BLOCK_DIR)
-    maps = load_map_configs(CONFIG_DIR)
-    book_orders = load_book_orders(CONFIG_DIR)
-    hints_def = load_generic_hints(CONFIG_DIR)
-    mp_hints = load_map_player_hints(CONFIG_DIR)
+    map_id, players = 10, 3
+    player_ids = INTERNAL_LABELS[:players]
+    game_state = GameState(player_ids)
 
-    # 2. 使用するマップIDとプレイヤー人数（デバッグ用に固定）
-    map_id = 10
-    players = 3  # 3～5対応
-
+    # データ読み込みと盤面構築
+    blocks = load_blocks("assets/blocks")
+    maps = load_map_configs("assets/configs")
+    hints_def = load_generic_hints("assets/configs")
+    book_orders = load_book_orders("assets/configs")
+    mp_hints = load_map_player_hints("assets/configs")
     map_info = maps.get(map_id)
-    if not map_info:
-        print(f"[!] map_id={map_id} が maps に存在しません")
-        return
 
-    # 3. 指定 map_id / 人数 に対応するヒント行（冊子位置）を取得
+    label_order = ["alpha", "beta", "gamma", "delta", "epsilon"]
     mp_row = next(
         (r for r in mp_hints if r["map_id"] == map_id and r["players"] == players), None)
-    if not mp_row:
-        print(f"[!] ヒントが定義されていない map_id={map_id}, players={players}")
-        return
+    used_labels = [label for label in label_order if mp_row.get(label)]
+    selected_labels = used_labels[:players]
 
-    # 4. alpha〜epsilon の順で、使用する冊子positionと列名のペアを抽出
-    labels = ["alpha", "beta", "gamma", "delta", "epsilon"]
-    positions_and_columns = []
-    for label in labels:
-        if len(positions_and_columns) >= players:
-            break
-        pos = mp_row.get(label)
-        if pos is not None:
-            positions_and_columns.append((pos, label))
-
-    # 5. 各プレイヤー用に、冊子position・列名 → hint_id を解決
-    hint_ids = []
-    for pos, col in positions_and_columns:
-        book = book_orders.get(pos)
-        if book and col in book and book[col]:
-            hint_ids.append(book[col])
-        else:
-            print(f"⚠ position={pos}, col={col} のヒントが見つかりません")
-
-    # 6. hint_id から generic_hints.csv 上のヒント定義を取得
     hints = []
-    for hid in hint_ids:
-        h = next((h for h in hints_def if h["hint_id"] == hid), None)
-        if h:
-            hints.append(h)
-        else:
-            print(f"⚠ ヒントID {hid} が generic_hints.csv に見つかりません")
+    for pid, label in zip(player_ids, selected_labels):
+        pos = mp_row[label]
+        hint_id = book_orders[pos][label]
+        hint = next(h for h in hints_def if h["hint_id"] == hint_id)
+        hints.append(hint)
 
-    # 7. ブロック配置 + 構造物情報 に基づいて board_data を構築
-    board_data = assemble_board(
-        blocks, map_info["blocks"], BLOCK_COLS, BLOCK_ROWS)
+    board_data = assemble_board(blocks, map_info["blocks"], 2, 3)
+    # デバッグ用（main.py の初期化後などに）
+    for coord, cell in board_data.items():
+        if cell is None:
+            print(f"警告: board_data に None が含まれています → {coord}")
+
+    for (col, row), cell in board_data.items():
+        cell.update({"col": col, "row": row, "cube": None, "discs": []})
     for s in map_info.get("structures", []):
-        key = (s["col"], s["row"])
-        if key in board_data:
-            board_data[key]["structure"] = s["type"]
-            board_data[key]["structure_color"] = s["color"]
+        if (s["col"], s["row"]) in board_data:
+            board_data[(s["col"], s["row"])].update({
+                "structure": s["type"],
+                "structure_color": s["color"]
+            })
 
-    # 8. apply_hint() による候補タイルの絞り込み処理
-    candidates = set(board_data.keys())
-    print(f"[開始] 候補タイル数: {len(candidates)}")
-    for i, h in enumerate(hints):
-        print(f"[{i+1}] ヒントID {h['hint_id']}: {h['text']}")
-        candidates = apply_hint(board_data, h, candidates)
-        print(f"     → 残り {len(candidates)} タイル")
-
-    print(f"\n✅ map_id={map_id}, players={players} における正解タイル:")
-    for coord in sorted(candidates):
-        print(f"  {coord}")
-
-    # 9. Tkinter ウィンドウに盤面とヒント結果を描画
+    # GUI構築
     root = tk.Tk()
-    root.title(f"Cryptid Map {map_id} — {players} players")
-    canvas = tk.Canvas(root, width=800, height=600, bg="white")
-    canvas.pack(fill="both", expand=True)
+    root.title("Cryptid Offline")
+    turn_label = create_turn_label(root)
+    terrain_imgs = load_terrain_images("assets/terrain")
+    canvas, radius, rows, cols = create_board_canvas(root)
 
-    # 地形画像読み込み
-    terrain_imgs = {}
-    for t in ("forest", "desert", "swamp", "sea", "mountain"):
-        path = os.path.join(IMAGE_DIR, f"{t}.png")
-        if os.path.exists(path):
-            terrain_imgs[t] = tk.PhotoImage(file=path)
-    canvas._terrain_imgs = terrain_imgs  # ガベージ回収対策
+    # --- アクションボタンの追加 ---
+    action_frame = tk.Frame(root)
+    action_frame.pack(side="bottom", fill="x")
 
-    # ブロック情報から全体のサイズを算出
-    sample = next(iter(blocks.values()))
-    bw = max(c for c, _ in sample.keys()) + 1
-    bh = max(r for _, r in sample.keys()) + 1
-    rows = BLOCK_ROWS * bh
-    cols = BLOCK_COLS * bw
-    radius = 30
+    def begin_question():
+        game_state.begin_question(None)
+        turn_label.config(
+            text=f"{display_name(game_state.current_player)} のターン（行動: 質問）")
 
-    # 盤面の描画
+    def begin_search():
+        game_state.begin_search()
+        turn_label.config(
+            text=f"{display_name(game_state.current_player)} のターン（行動: 探索）")
+
+    tk.Button(action_frame, text="質問する", command=begin_question).pack(
+        side="left", padx=10)
+    tk.Button(action_frame, text="探索する", command=begin_search).pack(
+        side="left", padx=10)
+
+    setup_canvas_bindings(canvas, board_data, hints, player_ids, game_state,
+                          radius, rows, cols, terrain_imgs, root, turn_label)
+
+    turn_label.config(text=f"{display_name(game_state.current_player)} のターン")
+    from ui.board_view import create_hex_board
     create_hex_board(canvas, board_data, rows, cols, radius, terrain_imgs)
-
-    # 絞り込まれた候補マス（正解マス）を黄色でハイライト
-    for c in candidates:
-        x, y = grid_to_pixel(c[0], c[1], radius)
-        pts = hex_corners(x, y, radius * 0.9)
-        canvas.create_polygon(*pts, fill="yellow",
-                              stipple="gray25", outline="")
-
     root.mainloop()
 
 
