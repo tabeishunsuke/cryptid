@@ -29,9 +29,9 @@ def handle_canvas_click(event, canvas, board_data, hints, player_ids, game_state
         handle_explore(coord, cell, current, player_ids, board_data, hints,
                        game_state, canvas, radius, rows, cols, terrain_imgs, root, turn_label)
 
-    elif game_state.current_action == "place_kube":
-        from .place_cube_handler import handle_place_kube
-        handle_place_kube(coord, cell, current, board_data, hints, game_state, player_ids,
+    elif game_state.current_action == "place_cube":
+        from .place_cube_handler import handle_place_cube
+        handle_place_cube(coord, cell, current, board_data, hints, game_state, player_ids,
                           canvas, radius, rows, cols, terrain_imgs, turn_label)
 
     elif game_state.current_action == "place_disc":

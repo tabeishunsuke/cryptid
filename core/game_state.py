@@ -20,7 +20,7 @@ class GameState:
         self.phase = "init"                   # "init", "main", "end"
 
         # 各プレイヤーの残りコマ数（必要なら制限数を設定）
-        self.kube_count = {p: 0 for p in player_colors}
+        self.cube_count = {p: 0 for p in player_colors}
         self.disk_count = {p: 0 for p in player_colors}
 
         # アクション履歴（ログ用）
@@ -64,6 +64,6 @@ class GameState:
         self.current_index = 0
         self.current_action = None
         self.phase = "init"
-        self.kube_count = {p: 0 for p in self.players}
+        self.cube_count = {p: 0 for p in self.players}
         self.disk_count = {p: 0 for p in self.players}
         self.history = []

@@ -4,7 +4,7 @@ from ui.board_view import create_hex_board
 import tkinter.messagebox as messagebox
 
 
-def handle_place_kube(coord, cell, pid, board_data, hints, game_state, player_ids,
+def handle_place_cube(coord, cell, pid, board_data, hints, game_state, player_ids,
                       canvas, radius, rows, cols, terrain_imgs, turn_label):
 
     hint = hints[player_ids.index(pid)]
@@ -18,7 +18,7 @@ def handle_place_kube(coord, cell, pid, board_data, hints, game_state, player_id
         return
 
     cell["cube"] = pid
-    game_state.kube_count[pid] += 1
+    game_state.cube_count[pid] += 1
     game_state.log(f"{display_name(pid)} は失敗処理で {coord} にキューブを配置。")
     game_state.current_action = None
     game_state.next_player()

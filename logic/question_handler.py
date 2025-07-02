@@ -7,6 +7,9 @@ from ui.board_view import create_hex_board
 
 def handle_question(coord, cell, current, player_ids, board_data, hints, game_state,
                     canvas, radius, rows, cols, terrain_imgs, turn_label):
+    if game_state.current_action == "place_cube":
+        messagebox.showinfo("アクション不可", "まずキューブを配置してください。")
+        return
 
     if cell.get("cube") is not None:
         messagebox.showinfo("無効な操作", "すでにキューブが置かれているマスには質問できません。")
@@ -36,9 +39,9 @@ def handle_question(coord, cell, current, player_ids, board_data, hints, game_st
             text=f"{display_name(game_state.current_player)} のターン")
     else:
         cell["cube"] = target_id
-        game_state.kube_count[target_id] += 1
+        game_state.cube_count[target_id] += 1
         game_state.log(f"{selected_label} は『いいえ』と回答し、キューブを配置。")
-        game_state.current_action = "place_kube"
+        game_state.current_action = "place_cube"
         turn_label.config(
             text=f"{display_name(game_state.current_player)}：質問失敗→キューブを置いてください")
 

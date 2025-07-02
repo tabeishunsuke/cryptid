@@ -7,6 +7,9 @@ from ui.board_view import create_hex_board
 
 def handle_place_disc(selected_coord, player_ids, board_data, hints, game_state,
                       canvas, radius, rows, cols, terrain_imgs, root, turn_label):
+    if game_state.current_action != "place_disc":
+        messagebox.showinfo("アクション不可", "現在はディスク配置フェーズではありません。")
+        return
 
     current = game_state.current_player
     own_hint = hints[player_ids.index(current)]

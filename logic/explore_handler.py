@@ -6,8 +6,11 @@ from ui.board_view import create_hex_board
 
 def handle_explore(coord, cell, current, player_ids, board_data, hints, game_state,
                    canvas, radius, rows, cols, terrain_imgs, root, turn_label):
+    if game_state.current_action == "place_cube":
+        messagebox.showinfo("アクション不可", "まずキューブを配置してください。")
+        return
 
-    if game_state.current_action in ("place_kube", "place_disc", "reveal_check"):
+    if game_state.current_action in ("place_cube", "place_disc", "reveal_check"):
         messagebox.showinfo("アクション不可", "まず現在のフェーズを完了してください。")
         return
 
@@ -88,10 +91,10 @@ def begin_reveal_sequence(coord, cell, current, player_ids, board_data, hints,
         if not applies:
             print(f"[探索失敗] {display_name(pid)} → 探索中断／キューブを配置")
             board_data[coord]["cube"] = pid
-            game_state.kube_count[pid] += 1
+            game_state.cube_count[pid] += 1
             game_state.log(f"{display_name(pid)} は反証できず、探索は中断。")
             game_state.current_index = player_ids.index(explorer)
-            game_state.current_action = "place_kube"
+            game_state.current_action = "place_cube"
             turn_label.config(
                 text=f"{display_name(explorer)}：探索失敗 → キューブを置いてください")
             create_hex_board(canvas, board_data, rows,

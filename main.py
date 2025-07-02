@@ -1,8 +1,8 @@
 import tkinter as tk
+from tkinter import messagebox
 from core.board_loader import load_blocks, assemble_board
 from core.map_loader import load_map_configs
 from core.data_loader import load_book_orders, load_generic_hints, load_map_player_hints
-from core.hint_engine import hint_applies_to_cell
 from core.game_state import GameState
 from ui.utils import load_terrain_images, create_turn_label, create_board_canvas
 from ui.dialogs import ask_player_selection
@@ -11,7 +11,7 @@ from handlers.canvas_handler import setup_canvas_bindings
 
 
 def main():
-    map_id, players = 10, 3
+    map_id, players = 10, 5
     player_ids = INTERNAL_LABELS[:players]
     game_state = GameState(player_ids)
 
@@ -63,11 +63,19 @@ def main():
     action_frame.pack(side="bottom", fill="x")
 
     def begin_question():
-        game_state.begin_question(None)
+        if game_state.current_action in ("place_cube", "place_disc", "reveal_check"):
+            messagebox.showinfo("操作無効", "現在のフェーズを完了してください。")
+            return
+        # 再選択可能に：別の行動に上書きする
+        game_state.current_action = "question"
         turn_label.config(
             text=f"{display_name(game_state.current_player)} のターン（行動: 質問）")
 
     def begin_search():
+        if game_state.current_action in ("place_cube", "place_disc", "reveal_check"):
+            messagebox.showinfo("操作無効", "現在のフェーズを完了してください。")
+            return
+        # 質問 → 探索 の切り替えを許容する（自由再選択）
         game_state.begin_search()
         turn_label.config(
             text=f"{display_name(game_state.current_player)} のターン（行動: 探索）")
