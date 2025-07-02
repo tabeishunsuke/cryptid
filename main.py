@@ -8,16 +8,15 @@ from core.map_loader import load_map_configs
 from core.data_loader import load_book_orders, load_generic_hints, load_map_player_hints
 from core.game_state import GameState
 from ui.utils import load_terrain_images, create_turn_label, create_board_canvas
-from ui.dialogs import ask_player_selection
 from ui.labels import display_name, INTERNAL_LABELS
 from handlers.canvas_handler import setup_canvas_bindings
-from ui.board_view import create_hex_board  # ← 背景対応版を使用
+from ui.board_view import create_hex_board  # 背景対応＋中央化対応済み
 
 
 def main():
     players = 4
 
-    # --- マップ選択（ランダム） ---
+    # --- マップ選択 ---
     maps = load_map_configs("assets/configs")
     valid_map_ids = list(maps.keys())
     map_id = random.choice(valid_map_ids)
@@ -49,7 +48,6 @@ def main():
 
     # --- 盤面構築 ---
     board_data = assemble_board(blocks, map_info["blocks"], 2, 3)
-
     for coord, cell in board_data.items():
         cell.update({
             "col": coord[0],
@@ -62,7 +60,6 @@ def main():
         for t in cell.get("territories", []):
             if t in ("bear", "eagle"):
                 cell["zone_marker"] = t
-
     for s in map_info.get("structures", []):
         key = (s["col"], s["row"])
         if key in board_data:
@@ -72,6 +69,8 @@ def main():
     # --- GUI構築 ---
     root = tk.Tk()
     root.title("Cryptid Offline")
+    root.state("zoomed")  # 起動時に最大化
+
     turn_label = create_turn_label(root)
     terrain_imgs = load_terrain_images("assets/terrain")
     canvas, radius, rows, cols = create_board_canvas(root)
@@ -111,13 +110,29 @@ def main():
     tk.Button(action_frame, text="探索する", command=begin_search).pack(
         side="left", padx=10)
 
-    # --- イベント登録と初期描画 ---
+    # --- イベント登録 ---
     setup_canvas_bindings(canvas, board_data, hints, player_ids, game_state,
                           radius, rows, cols, terrain_imgs, root, turn_label)
 
     turn_label.config(text=f"{display_name(game_state.current_player)} のターン")
-    create_hex_board(canvas, board_data, rows, cols, radius,
-                     terrain_imgs, background_img=bg_img)
+
+    # ✅ 起動後に盤面描画を遅延実行（キャンバスサイズ確定待ち）
+    def delayed_draw():
+        create_hex_board(canvas, board_data, rows, cols, radius,
+                         terrain_imgs, background_img=bg_img)
+    root.after(100, delayed_draw)
+
+    # ✅ リサイズ時に再描画（盤面を常に中央表示に）
+    last_size = {"w": 0, "h": 0}
+
+    def on_resize(event):
+        w_now, h_now = canvas.winfo_width(), canvas.winfo_height()
+        if (w_now, h_now) != (last_size["w"], last_size["h"]):
+            last_size["w"], last_size["h"] = w_now, h_now
+            create_hex_board(canvas, board_data, rows, cols,
+                             radius, terrain_imgs, background_img=bg_img)
+
+    root.bind("<Configure>", on_resize)
 
     root.mainloop()
 

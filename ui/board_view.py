@@ -1,44 +1,44 @@
 import math
 
 
-def grid_to_pixel(col, row, radius):
-    x = radius * 3 / 2 * col
-    y = radius * math.sqrt(3) * (row + 0.5 * (col % 2))
-    return x + radius + 10, y + radius + 10
-
-
 def create_hex_board(canvas, board_data, rows, cols, radius, terrain_imgs, background_img=None):
+    canvas.update_idletasks()
+    canvas_width = canvas.winfo_width()
+    canvas_height = canvas.winfo_height()
+
     canvas.delete("all")
 
-    # 背景描画（画像があれば）
+    # 🔳 背景画像の表示（中央）
     if background_img:
-        canvas_width = int(canvas["width"])
-        canvas_height = int(canvas["height"])
         canvas.create_image(canvas_width // 2, canvas_height //
                             2, image=background_img, anchor="center")
-        canvas.bg_img = background_img
+        canvas.bg_img = background_img  # 参照保持でGC対策
 
-    # --- 🔧 中央配置用オフセット計算 ---
-    cols_ = [col for col, _ in board_data]
-    rows_ = [row for _, row in board_data]
-    min_col, max_col = min(cols_), max(cols_)
-    min_row, max_row = min(rows_), max(rows_)
+    # 🧠 描画予定の全マスの中心座標を取得（pixel）
+    positions = []
+    for (col, row) in board_data:
+        cx = radius * 1.5 * col
+        cy = radius * math.sqrt(3) * (row + 0.5 * (col % 2))
+        positions.append((cx, cy))
 
-    canvas_width = int(canvas["width"])
-    canvas_height = int(canvas["height"])
+    # 🧮 描画領域のバウンディングボックスを取得
+    min_x = min(p[0] for p in positions)
+    max_x = max(p[0] for p in positions)
+    min_y = min(p[1] for p in positions)
+    max_y = max(p[1] for p in positions)
 
-    board_width = radius * 1.5 * (max_col - min_col + 1)
-    board_height = radius * math.sqrt(3) * (max_row - min_row + 1)
+    board_w = max_x - min_x
+    board_h = max_y - min_y
 
-    offset_x = (canvas_width - board_width) / 2 - \
-        radius * 1.5 * min_col + radius
-    offset_y = (canvas_height - board_height) / 2 - radius * \
-        math.sqrt(3) * (min_row + 0.5 * (min_col % 2)) + radius
+    # 🎯 キャンバスの中央に配置するためのオフセット
+    offset_x = (canvas_width / 2) - (min_x + board_w / 2)
+    offset_y = (canvas_height / 2) - (min_y + board_h / 2)
 
-    canvas.hex_offset = (offset_x, offset_y)
+    canvas.hex_offset = (offset_x, offset_y)  # クリック処理用に保持
 
+    # 🎨 各マスを描画
     for (col, row), cell in board_data.items():
-        cx = radius * 3 / 2 * col + offset_x
+        cx = radius * 1.5 * col + offset_x
         cy = radius * math.sqrt(3) * (row + 0.5 * (col % 2)) + offset_y
 
         # 地形
@@ -46,10 +46,10 @@ def create_hex_board(canvas, board_data, rows, cols, radius, terrain_imgs, backg
         if terrain in terrain_imgs:
             canvas.create_image(cx, cy, image=terrain_imgs[terrain])
 
-        # 縄張り（zone_marker）
+        # 縄張り（zone）
         zone = cell.get("zone_marker")
-        ratio = 0.8
         if zone in ("bear", "eagle"):
+            ratio = 0.8
             points = []
             for i in range(6):
                 angle = math.radians(60 * i)
@@ -62,7 +62,7 @@ def create_hex_board(canvas, board_data, rows, cols, radius, terrain_imgs, backg
             elif zone == "eagle":
                 canvas.create_polygon(points, outline="red", fill="", width=2)
 
-        # 六角形の枠線
+        # 六角形枠
         hex_points = []
         for i in range(6):
             angle = math.radians(60 * i)

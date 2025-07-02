@@ -68,8 +68,7 @@ def create_turn_label(root):
 
 
 def create_board_canvas(root):
-    width, height = 1800, 800
-    canvas = tk.Canvas(root, width=width, height=height, bg="white")
+    canvas = tk.Canvas(root, bg="white")
     canvas.pack(fill="both", expand=True)
     radius = 45
     rows = 9
