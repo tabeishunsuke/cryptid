@@ -1,7 +1,7 @@
 from collections import defaultdict
 from core.board_loader import load_blocks, assemble_board
-from core.map_loader import load_map_configs
-from core.data_loader import load_book_orders, load_generic_hints, load_map_player_hints
+from core.map_config_loader import load_map_configs
+from core.hint_loader import load_book_orders, load_generic_hints, load_map_player_hints
 from core.hint_engine import apply_hint
 
 # 定数定義：ブロック構成やディレクトリパス
