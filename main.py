@@ -1,142 +1,108 @@
-import os
-import random
 import tkinter as tk
-from tkinter import messagebox
-
-from core.board_loader import load_blocks, assemble_board
-from core.map_config_loader import load_map_configs
-from core.hint_loader import load_book_orders, load_generic_hints, load_map_player_hints
-from core.game_state import GameState
-from ui.canvas_utils import load_terrain_images
-from ui.labels import display_name, INTERNAL_LABELS
-from actions.canvas_handler import bind_canvas_events
-from ui.board_renderer import render_board
-from ui.canvas_utils import create_turn_label, create_board_canvas
+from core.map_config_loader import MapConfigLoader
+from core.hint_loader import HintLoader
+from core.game_engine import GameEngine
+from ui.board_renderer import BoardRenderer
+from actions.phase_handler import PhaseHandler
+from ui.canvas_utils import pixel_to_cell_coord
+from ui.image_loader import load_terrain_images
+from ui.labels import generate_display_labels
 
 
 def main():
-    """ゲームのメインエントリーポイント"""
-    players = 4
+    # 1️⃣ マップ構成とヒント情報をロード
+    map_loader = MapConfigLoader()
+    hint_loader = HintLoader()
 
-    # --- マップとプレイヤー準備 ---
-    maps = load_map_configs("assets/configs")
-    # map_id = random.choice(list(maps.keys()))
-    map_id = 2
-    map_info = maps.get(map_id)
+    # 使用マップIDを取得
+    map_id = map_loader.get_available_map_ids()[0]
+    board_data = map_loader.load_map(map_id)
 
-    print(f"[INFO] 使用マップID → {map_id}")
-    player_ids = INTERNAL_LABELS[:players]
-    game_state = GameState(player_ids)
+    # プレイヤー情報とヒントを取得
+    player_ids, hints = hint_loader.get_hint_for_map(map_id)
+    label_map = generate_display_labels(player_ids)
 
-    # --- ヒント・構成読み込み ---
-    blocks = load_blocks("assets/blocks")
-    generic_hints = load_generic_hints("assets/configs")
-    book_orders = load_book_orders("assets/configs")
-    mp_hints = load_map_player_hints("assets/configs")
-
-    # プレイヤーごとのヒント設定
-    label_order = ["alpha", "beta", "gamma", "delta", "epsilon"]
-    mp_row = next(
-        (r for r in mp_hints if r["map_id"] == map_id and r["players"] == players), None)
-    selected_labels = [
-        label for label in label_order if mp_row.get(label)][:players]
-
-    hints = []
-    for pid, label in zip(player_ids, selected_labels):
-        pos = mp_row[label]
-        hint_id = book_orders[pos][label]
-        hint = next(h for h in generic_hints if h["hint_id"] == hint_id)
-        hints.append(hint)
-
-    # --- 盤面構築 ---
-    board_data = assemble_board(blocks, map_info["blocks"], 2, 3)
-    for coord, cell in board_data.items():
-        cell.update({
-            "col": coord[0],
-            "row": coord[1],
-            "cube": None,
-            "discs": [],
-            "structure": None,
-            "structure_color": None,
-        })
-        for t in cell.get("territories", []):
-            if t in ("bear", "eagle"):
-                cell["zone_marker"] = t
-
-    for s in map_info.get("structures", []):
-        key = (s["col"], s["row"])
-        if key in board_data:
-            board_data[key]["structure"] = s["type"]
-            board_data[key]["structure_color"] = s["color"]
-
-    # --- GUI構築 ---
+    # 2️⃣ GUI初期化（Tkinterウィンドウ）
     root = tk.Tk()
-    root.title("Cryptid Offline")
-    root.state("zoomed")  # 起動時に最大化
+    root.title("Cryptid Inspired Game")
 
-    turn_label = create_turn_label(root)
-    terrain_imgs = load_terrain_images("assets/terrain")
-    canvas, radius, rows, cols = create_board_canvas(root)
+    # 画像・サイズ・行列数の定義
+    terrain_imgs = load_terrain_images()
+    radius = 30
+    rows = 9
+    cols = 12
 
-    # --- 背景画像の読み込み（ランダム） ---
-    bg_img = None
-    bg_dir = "assets/backgrounds"
-    bg_files = [f for f in os.listdir(
-        bg_dir) if f.lower().endswith((".png", ".gif"))]
-    if bg_files:
-        bg_path = os.path.join(bg_dir, random.choice(bg_files))
-        print(f"[INFO] 背景画像 → {bg_path}")
-        bg_img = tk.PhotoImage(file=bg_path)
+    # 📐 マップのピクセルサイズ計算（六角形サイズから）
+    map_width_px = radius * 3/2 * cols + radius / 2
+    map_height_px = radius * (3**0.5) * (rows + 1)
 
-    # --- アクションボタン ---
-    action_frame = tk.Frame(root)
-    action_frame.pack(side="bottom", fill="x")
+    # 📏 マージン（マップサイズの比率で計算）
+    margin_x = int(map_width_px * 0.20)   # 左右20%
+    margin_y = int(map_height_px * 0.1)  # 上下10%
 
-    def start_question_phase():
-        if game_state.current_action in ("place_cube", "place_disc", "reveal_check"):
-            messagebox.showinfo("操作無効", "現在のフェーズを完了してください。")
-            return
-        game_state.current_action = "question"
+    # 🎨 キャンバスサイズ（マップ＋マージン）
+    canvas_width = int(map_width_px + margin_x * 2)
+    canvas_height = int(map_height_px + margin_y * 2)
+
+    # 🧃 UI領域（ラベル＋ボタン分）
+    ui_padding_height = 120
+    total_height = canvas_height + ui_padding_height
+
+    # 🖼 ウィンドウサイズを明示指定（起動時点で正確に表示）
+    root.geometry(f"{canvas_width}x{total_height}")
+
+    # 🔤 ターン表示ラベル（上部配置）
+    turn_label = tk.Label(root, text="", font=("Helvetica", 14))
+    turn_label.pack(side=tk.TOP, pady=10)
+
+    # 🎮 ゲームエンジン・描画エンジン初期化
+    engine = GameEngine(player_ids, hints, board_data, label_map)
+    renderer = BoardRenderer(canvas=None, terrain_imgs=terrain_imgs,
+                             radius=radius, margin_x=margin_x, margin_y=margin_y)
+
+    # 🖼 キャンバス生成（中央配置）
+    canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
+    canvas.pack(side=tk.TOP)
+    renderer.canvas = canvas  # Canvasをインスタンスに再設定
+    renderer.render(engine.board.tiles, rows, cols)
+
+    # 💡 初期ターン表示
+    turn_label.config(text=f"{label_map[engine.state.current_player]} のターン")
+
+    # 🔀 ゲームフェーズ制御
+    handler = PhaseHandler(engine, canvas, root, turn_label,
+                           terrain_imgs, radius, rows, cols, renderer)
+
+    # 🖱 クリック処理
+    def on_click(event):
+        coord = pixel_to_cell_coord(event.x, event.y, radius, canvas)
+        handler.handle_click(coord)
+
+    canvas.bind("<Button-1>", on_click)
+
+    # 🔘 質問・探索ボタン（下部配置）
+    def set_phase_question():
+        engine.state.set_phase("question")
         turn_label.config(
-            text=f"{display_name(game_state.current_player)} のターン（行動: 質問）")
+            text=f"{label_map[engine.state.current_player]} - 質問フェーズ")
 
-    def start_search_phase():
-        if game_state.current_action in ("place_cube", "place_disc", "reveal_check"):
-            messagebox.showinfo("操作無効", "現在のフェーズを完了してください。")
-            return
-        game_state.begin_search()
+    def set_phase_search():
+        engine.state.set_phase("search")
         turn_label.config(
-            text=f"{display_name(game_state.current_player)} のターン（行動: 探索）")
+            text=f"{label_map[engine.state.current_player]} - 探索フェーズ")
 
-    tk.Button(action_frame, text="質問する", command=start_question_phase).pack(
-        side="left", padx=10)
-    tk.Button(action_frame, text="探索する", command=start_search_phase).pack(
-        side="left", padx=10)
+    btn_frame = tk.Frame(root)
+    btn_frame.pack(side=tk.BOTTOM, pady=10)
 
-    # --- イベント登録・盤面描画 ---
-    bind_canvas_events(canvas, board_data, hints, player_ids, game_state,
-                       radius, rows, cols, terrain_imgs, root, turn_label)
+    question_btn = tk.Button(btn_frame, text="質問",
+                             command=set_phase_question, width=10)
+    search_btn = tk.Button(btn_frame, text="探索",
+                           command=set_phase_search, width=10)
 
-    turn_label.config(text=f"{display_name(game_state.current_player)} のターン")
+    question_btn.pack(side=tk.LEFT, padx=5)
+    search_btn.pack(side=tk.LEFT, padx=5)
 
-    def delayed_draw():
-        render_board(canvas, board_data, rows, cols, radius,
-                     terrain_imgs, background_img=bg_img)
-
-    root.after(100, delayed_draw)
-
-    # --- リサイズ対応再描画 ---
-    last_size = {"w": 0, "h": 0}
-
-    def on_resize(event):
-        w_now, h_now = canvas.winfo_width(), canvas.winfo_height()
-        if (w_now, h_now) != (last_size["w"], last_size["h"]):
-            last_size["w"], last_size["h"] = w_now, h_now
-            render_board(canvas, board_data, rows, cols, radius,
-                         terrain_imgs, background_img=bg_img)
-
-    root.bind("<Configure>", on_resize)
-
+    # 🚀 メインループ開始
     root.mainloop()
 
 

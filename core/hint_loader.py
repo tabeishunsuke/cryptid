@@ -1,106 +1,115 @@
 import csv
-import os
 
 
-def load_book_orders(config_dir):
+class HintLoader:
     """
-    config_dir/book_orders.csv を読み込み、位置ごとの冊子対応表を返す。
-
-    構造:
-        position, alpha, beta, gamma, delta, epsilon
-
-    戻り値:
-        dict[int, dict[str, Optional[int]]]
-            例）{ 1: { "alpha": 12, "beta": None, ... }, ... }
+    Cryptidのヒント情報ローダー。
+    - map_player_hints.csv: マップIDごとの冊子使用ページ定義
+    - book_orders.csv: 冊子ページ → 冊子ごとの hint_id 定義
+    - generic_hints.csv: hint_id → ヒントの詳細内容
     """
-    path = os.path.join(config_dir, "book_orders.csv")
-    book_orders = {}
 
-    with open(path, encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            try:
-                pos = int(row["position"].strip())
-                book_orders[pos] = {
-                    label: int(row[label].strip()) if row.get(
-                        label, "").strip() else None
-                    for label in ["alpha", "beta", "gamma", "delta", "epsilon"]
-                }
-            except Exception:
-                continue
-    return book_orders
+    def __init__(self,
+                 generic_hint_csv="assets/configs/generic_hints.csv",
+                 book_order_csv="assets/configs/book_orders.csv",
+                 player_hint_csv="assets/configs/map_player_hints.csv"):
+        self.generic_hint_csv = generic_hint_csv
+        self.book_order_csv = book_order_csv
+        self.player_hint_csv = player_hint_csv
 
+        self.generic_hints = {}           # hint_id → hint情報
+        self.book_orders = {}             # position → {alpha〜epsilon: hint_id}
+        self.map_hint_mapping = {}        # map_id → {alpha〜epsilon: position}
+        self.map_player_count = {}        # map_id → プレイヤー数
 
-def load_generic_hints(config_dir):
-    """
-    config_dir/generic_hints.csv を読み込み、一般ヒントの一覧を返す。
+        # 初期化
+        self._load_generic_hints()
+        self._load_book_orders()
+        self._load_player_hints()
 
-    ヒント形式:
-        hint_id, hint_type, param1, param2, text
-    """
-    path = os.path.join(config_dir, "generic_hints.csv")
-    with open(path, encoding="utf-8-sig") as f:
-        lines = [line for line in f if line.strip(
-        ) and not line.lstrip().startswith("#")]
+    def _load_generic_hints(self):
+        """
+        generic_hints.csv を読み込み、hint_id をキーに辞書構造へ。
+        """
+        with open(self.generic_hint_csv, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    hid = int(row["hint_id"].strip())
+                    self.generic_hints[hid] = {
+                        "hint_type": row["hint_type"].strip(),
+                        "param1": row["param1"].strip(),
+                        "param2": row["param2"].strip(),
+                        "text": row["text"].strip()
+                    }
+                except Exception as e:
+                    print(f"[Hint Load Error] {e} → 行: {row}")
 
-    if not lines:
-        return []
+    def _load_book_orders(self):
+        """
+        book_orders.csv を読み込み、position（冊子ページ）ごとの冊子ごとの hint_id を格納。
+        """
+        with open(self.book_order_csv, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    position = int(row["position"].strip())
+                    hint_map = {}
+                    for pid in ["alpha", "beta", "gamma", "delta", "epsilon"]:
+                        val = row.get(pid, "").strip()
+                        if val.isdigit():
+                            hint_map[pid] = int(val)
+                    self.book_orders[position] = hint_map
+                except Exception as e:
+                    print(f"[Book Order Load Error] {e} → 行: {row}")
 
-    header = [h.strip() for h in lines[0].split(",")]
-    reader = csv.reader(lines[1:], skipinitialspace=True)
+    def _load_player_hints(self):
+        """
+        map_player_hints.csv を読み込み、map_idごとの冊子使用ページを保持。
+        """
+        with open(self.player_hint_csv, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    map_id = int(row["map_id"].strip())
+                    players = int(row["players"].strip())
+                    hint_positions = {}
+                    for pid in ["alpha", "beta", "gamma", "delta", "epsilon"]:
+                        val = row.get(pid, "").strip()
+                        if val.isdigit():
+                            hint_positions[pid] = int(val)
+                    self.map_hint_mapping[map_id] = hint_positions
+                    self.map_player_count[map_id] = players
+                except Exception as e:
+                    print(f"[Map Hint Load Error] {e} → 行: {row}")
 
-    hints = []
-    for row in reader:
-        if len(row) != len(header):
-            continue
-        rec = dict(zip(header, row))
-        try:
-            hints.append({
-                "hint_id": int(rec["hint_id"]),
-                "hint_type": rec["hint_type"].strip(),
-                "param1": rec.get("param1", "").strip(),
-                "param2": rec.get("param2", "").strip(),
-                "text": rec.get("text", "").strip(),
-            })
-        except Exception:
-            continue
-    return hints
+    def get_hint_for_map(self, map_id):
+        """
+        指定map_idに対応するプレイヤーID順とヒント情報を返す。
 
+        Returns:
+            player_ids: [str] 使用プレイヤー順
+            hint_list: [dict] generic_hintsベースのヒント内容
+        """
+        if map_id not in self.map_hint_mapping:
+            raise ValueError(f"マップID {map_id} に対する冊子情報が見つかりません")
 
-def load_map_player_hints(config_dir):
-    """
-    config_dir/map_player_hints.csv を読み込み、
-    各マップIDとプレイヤー数に対応するヒント割り当てを返す。
+        # 冊子使用ページ
+        hint_pos_map = self.map_hint_mapping[map_id]
 
-    構造:
-        map_id, players, alpha, beta, gamma, delta, epsilon
-    """
-    path = os.path.join(config_dir, "map_player_hints.csv")
-    with open(path, encoding="utf-8-sig") as f:
-        lines = [line for line in f if line.strip(
-        ) and not line.lstrip().startswith("#")]
+        player_ids = list(hint_pos_map.keys())[:self.map_player_count[map_id]]
+        hint_list = []
 
-    if not lines:
-        return []
+        for pid in player_ids:
+            position = hint_pos_map.get(pid)
+            if position not in self.book_orders:
+                raise ValueError(f"冊子ページ {position} の内容が見つかりません（プレイヤー {pid}）")
 
-    header = [h.strip() for h in lines[0].split(",")]
-    reader = csv.reader(lines[1:], skipinitialspace=True)
+            hint_id = self.book_orders[position].get(pid)
+            if hint_id not in self.generic_hints:
+                raise ValueError(f"ヒントID {hint_id} が見つかりません（プレイヤー {pid}）")
 
-    rows = []
-    for row in reader:
-        if len(row) != len(header):
-            continue
-        rec = dict(zip(header, row))
-        try:
-            rows.append({
-                "map_id": int(rec["map_id"].strip()),
-                "players": int(rec["players"].strip()),
-                **{
-                    label: int(rec[label].strip()) if rec.get(
-                        label, "").strip() else None
-                    for label in ["alpha", "beta", "gamma", "delta", "epsilon"]
-                }
-            })
-        except Exception:
-            continue
-    return rows
+            hint = self.generic_hints[hint_id]
+            hint_list.append(hint)
+
+        return player_ids, hint_list

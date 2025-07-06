@@ -1,19 +1,15 @@
-# プレイヤーIDの内部表現と表示名の対応関係
-INTERNAL_LABELS = ["alpha", "beta", "gamma", "delta", "epsilon"]
-DISPLAY_LABELS = [f"プレイヤー{i + 1}" for i in range(len(INTERNAL_LABELS))]
-
-# マッピング辞書（例: "alpha" → "プレイヤー1"）
-LABEL_MAP = dict(zip(INTERNAL_LABELS, DISPLAY_LABELS))
-
-
-def display_name(player_id):
+def generate_display_labels(player_ids):
     """
-    内部ID（alpha〜epsilon）を表示用のラベルに変換する。
-
-    Args:
-        player_id (str): プレイヤー識別子（例: "alpha"）
-
-    Returns:
-        str: 表示名（例: "プレイヤー1"）
+    プレイヤーIDに対応する表示名を生成する。
+    例: "alpha" → "プレイヤー1"
     """
-    return LABEL_MAP.get(player_id, player_id)
+    return {pid: f"プレイヤー{i + 1}" for i, pid in enumerate(player_ids)}
+
+
+def display_name(pid, label_map=None):
+    """
+    表示名を取得（ラベルマップがある場合はそれを使用）
+    """
+    if label_map:
+        return label_map.get(pid, pid)
+    return pid

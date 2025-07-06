@@ -1,101 +1,40 @@
-import os
-import tkinter as tk
 import math
 
 
-def grid_to_pixel(col, row, radius):
+def pixel_to_cell_coord(x, y, radius, canvas):
     """
-    グリッド座標（col, row）をピクセル座標に変換する。
+    ピクセル座標 (x, y) を盤面の hex座標 (col, row) に変換する。
+    radius = 六角形のサイズ（pixel単位）
+
+    この変換は完璧ではないが、おおよそ正しく動作する。
     """
-    x = radius * 1.5 * col
-    y = radius * math.sqrt(3) * (row + 0.5 * (col % 2))
-    return x, y
-
-
-def pixel_to_cell_coord(x, y, radius, canvas=None):
-    """
-    ピクセル座標 → ヘックスのグリッド座標（col, row）に変換する。
-
-    キャンバスの中央オフセットを補正して正確な座標を得る。
-    """
-    if canvas and hasattr(canvas, "hex_offset"):
-        ox, oy = canvas.hex_offset
-        x -= ox
-        y -= oy
-    else:
-        x -= radius + 10
-        y -= radius + 10
-
-    col = int(round(x / (1.5 * radius)))
-    col_offset = 0.5 * radius * math.sqrt(3) if col % 2 else 0
-    row = int(round((y - col_offset) / (radius * math.sqrt(3))))
+    q = (x * math.sqrt(3)/3 - y / 3) / radius
+    r = y * 2/3 / radius
+    col = round(q)
+    row = round(r)
     return col, row
 
 
-def is_point_in_polygon(px, py, vertices):
+def draw_regular_polygon(canvas, x, y, radius, vertex, fill_color):
     """
-    点(px, py) が多角形 vertices 内にあるかを判定。
-    射影法（偶数交差）に基づいている。
+    正多角形を描画するユーティリティ関数
+    - canvas: TkinterのCanvasオブジェクト
+    - x, y: 中心座標
+    - radius: 中心から頂点までの距離
+    - sides: 頂点の数（3=三角形、4=四角形、8=八角形など）
+    - fill_color: 塗りつぶし色
     """
-    n = len(vertices)
-    inside = False
-    for i in range(n):
-        x0, y0 = vertices[i]
-        x1, y1 = vertices[(i + 1) % n]
-        if ((y0 > py) != (y1 > py)) and (px < (x1 - x0) * (py - y0) / (y1 - y0 + 1e-9) + x0):
-            inside = not inside
-    return inside
+    points = []
 
+    if vertex % 2 == 0:
+        start_angle = math.pi / 2 + math.pi / vertex
+    else:
+        start_angle = math.pi / 2
 
-def is_point_in_hex(px, py, col, row, radius, canvas):
-    """
-    マス(col, row) の六角形領域内に (px, py) が含まれるかを判定。
-    中心座標と頂点からポリゴン境界で判断。
-    """
-    ox, oy = getattr(canvas, "hex_offset", (0, 0))
-    cx = radius * 1.5 * col + ox
-    cy = radius * math.sqrt(3) * (row + 0.5 * (col % 2)) + oy
+    for i in range(vertex):
+        angle = 2 * math.pi * i / vertex - start_angle
+        px = x + radius * math.cos(angle)
+        py = y + radius * math.sin(angle)
+        points.extend([px, py])
 
-    vertices = []
-    for i in range(6):
-        angle = math.radians(60 * i)
-        vx = cx + radius * math.cos(angle)
-        vy = cy + radius * math.sin(angle)
-        vertices.append((vx, vy))
-
-    return is_point_in_polygon(px, py, vertices)
-
-
-def load_terrain_images(image_dir):
-    """
-    指定ディレクトリから地形画像（.png）を読み込む。
-    """
-    terrain_imgs = {}
-    for t in ("forest", "desert", "swamp", "sea", "mountain"):
-        path = os.path.join(image_dir, f"{t}.png")
-        if os.path.exists(path):
-            terrain_imgs[t] = tk.PhotoImage(file=path)
-    return terrain_imgs
-
-
-def create_turn_label(root):
-    """
-    ターン表示用のラベルを作成して返す。
-    """
-    frame = tk.Frame(root)
-    frame.pack(side="top", fill="x")
-    label = tk.Label(frame, text="", font=("Arial", 14))
-    label.pack(side="left", padx=10)
-    return label
-
-
-def create_board_canvas(root):
-    """
-    盤面描画用のキャンバス領域を構築する。
-    """
-    canvas = tk.Canvas(root, bg="white")
-    canvas.pack(fill="both", expand=True)
-    radius = 45
-    rows = 9
-    cols = 12
-    return canvas, radius, rows, cols
+    canvas.create_polygon(points, fill=fill_color)

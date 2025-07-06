@@ -1,129 +1,129 @@
 import math
+from ui.canvas_utils import draw_regular_polygon
 
 
-def render_board(canvas, board_data, rows, cols, radius, terrain_imgs, background_img=None):
+class BoardRenderer:
     """
-    ゲーム盤面を描画する（背景含む中央配置対応済）
-
-    Args:
-        canvas: Tkinter キャンバス
-        board_data: (col, row) → セル情報の辞書
-        rows, cols, radius: 配置用の構成情報
-        terrain_imgs: 地形ごとの画像辞書
-        background_img: 背景画像（中央配置）
+    Tkinterキャンバス上にマップを描画するクラス。
+    地形・構造物・トークンを描画する。
     """
-    canvas.update_idletasks()
-    canvas_width = canvas.winfo_width()
-    canvas_height = canvas.winfo_height()
 
-    canvas.delete("all")
+    def __init__(self, canvas, terrain_imgs, radius, margin_x=0, margin_y=0):
+        self.canvas = canvas                 # 描画対象のCanvas
+        self.terrain_imgs = terrain_imgs     # 地形画像の辞書
+        self.radius = radius                 # 六角形サイズ
+        self.margin_x = margin_x             # 左右余白
+        self.margin_y = margin_y             # 上下余白
 
-    # 🎨 背景画像の描画（中央）
-    if background_img:
-        canvas.create_image(canvas_width // 2, canvas_height //
-                            2, image=background_img, anchor="center")
-        canvas.bg_img = background_img  # ガベージコレクション対策
+    def render(self, tile_data, rows, cols):
+        """
+        全マップを一括描画
+        """
+        self.canvas.delete("all")
 
-    # 🧠 全マスの中心座標を収集
-    positions = []
-    for (col, row) in board_data:
-        cx = radius * 1.5 * col
-        cy = radius * math.sqrt(3) * (row + 0.5 * (col % 2))
-        positions.append((cx, cy))
+        for (col, row), cell in tile_data.items():
+            x, y = self._hex_to_pixel(col, row)
+            terrain = cell.get("terrain", "")
+            terrain_img = self.terrain_imgs.get(terrain)
 
-    # 🧮 バウンディングボックス取得
-    min_x = min(p[0] for p in positions)
-    max_x = max(p[0] for p in positions)
-    min_y = min(p[1] for p in positions)
-    max_y = max(p[1] for p in positions)
+            # 🖼 地形画像の描画
+            if terrain_img:
+                self.canvas.create_image(x, y, image=terrain_img)
 
-    board_w = max_x - min_x
-    board_h = max_y - min_y
+            # 🐻🦅 縄張り（territory）の描画
+            for territory in cell.get("territories", []):
+                self._draw_territory(x, y, territory)
 
-    offset_x = (canvas_width / 2) - (min_x + board_w / 2)
-    offset_y = (canvas_height / 2) - (min_y + board_h / 2)
+            # 🏛️ 建造物（stone, ruin）の描画
+            if cell.get("structure"):
+                self._draw_structure(
+                    x, y, cell["structure"], cell["structure_color"])
 
-    canvas.hex_offset = (offset_x, offset_y)  # クリック判定の座標補正用
+            # 🔴 ディスク（プレイヤーごとに複数対応）
+            for i, pid in enumerate(cell.get("discs", [])):
+                self._draw_disc(x, y, pid, offset=i)
 
-    # 🔷 各タイルを描画
-    for (col, row), cell in board_data.items():
-        cx = radius * 1.5 * col + offset_x
-        cy = radius * math.sqrt(3) * (row + 0.5 * (col % 2)) + offset_y
+            # 🟦 キューブ（1人1つのマーカー）
+            if cell.get("cube"):
+                self._draw_cube(x, y, cell["cube"])
 
-        # 地形描画
-        terrain = cell.get("terrain")
-        if terrain in terrain_imgs:
-            canvas.create_image(cx, cy, image=terrain_imgs[terrain])
+    def _hex_to_pixel(self, col, row):
+        """
+        六角形の座標(col, row) → ピクセル座標(x, y) に変換
+        余白を考慮して中央配置になるよう調整
+        """
+        x = self.radius * 3/2 * col
+        y = self.radius * (3**0.5) * (row + 0.5 * (col % 2))
+        return x + self.margin_x, y + self.margin_y
 
-        # 縄張りマーカー（bear/eagle）
-        zone = cell.get("zone_marker")
-        if zone in ("bear", "eagle"):
-            ratio = 0.8
-            points = []
-            for i in range(6):
-                angle = math.radians(60 * i)
-                px = cx + radius * ratio * math.cos(angle)
-                py = cy + radius * ratio * math.sin(angle)
-                points.extend([px, py])
-            if zone == "bear":
-                canvas.create_polygon(
-                    points, outline="black", fill="", width=2, dash=(15, 8))
-            elif zone == "eagle":
-                canvas.create_polygon(points, outline="red", fill="", width=2)
+    def _draw_territory(self, x, y, territory_type):
+        import math
+        r = self.radius * 0.8
 
-        # 六角枠線
-        hex_points = []
+        # 六角形頂点（フラットトップ）
+        vertices = []
         for i in range(6):
             angle = math.radians(60 * i)
-            px = cx + radius * math.cos(angle)
-            py = cy + radius * math.sin(angle)
-            hex_points.extend([px, py])
-        canvas.create_polygon(hex_points, outline="gray", fill="", width=2)
+            px = x + r * math.cos(angle)
+            py = y + r * math.sin(angle)
+            vertices.append((px, py))
 
-        # 構造物（stone / ruin）
-        structure = cell.get("structure")
-        if structure in ("stone", "ruin"):
-            color = cell.get("structure_color", "gray")
-            shape = []
-            if structure == "stone":
-                for i in range(8):
-                    angle = math.radians(45 * i + 22.5)
-                    px = cx + radius * 0.5 * math.cos(angle)
-                    py = cy + radius * 0.5 * math.sin(angle)
-                    shape.extend([px, py])
-            elif structure == "ruin":
-                for i in range(3):
-                    angle = math.radians(120 * i - 90)
-                    px = cx + radius * 0.6 * math.cos(angle)
-                    py = cy + radius * 0.6 * math.sin(angle)
-                    shape.extend([px, py])
-            canvas.create_polygon(shape, fill=color, outline="black", width=2)
+        if territory_type == "bear":
+            # 各辺に対して点線描画（3本の実線セグメント）
+            segments = [(0, 3/20), (7/20, 13/20), (17/20, 1)]
+            for i in range(6):
+                p_start = vertices[i]
+                p_end = vertices[(i + 1) % 6]
 
-        # キューブ
-        cube_owner = cell.get("cube")
-        if cube_owner:
-            color = cube_color(cube_owner)
-            canvas.create_rectangle(
-                cx - radius * 0.35, cy - radius * 0.35,
-                cx + radius * 0.35, cy + radius * 0.35,
-                fill=color, outline="black", width=1
-            )
+                # ベクトル q（辺の方向）
+                qx = p_end[0] - p_start[0]
+                qy = p_end[1] - p_start[1]
 
-        # ディスク
-        discs = cell.get("discs", [])
-        for i, pid in enumerate(discs):
-            offset = (i - len(discs) / 2 + 0.5) * radius * 0.3
-            canvas.create_oval(
-                cx + offset - radius * 0.15, cy + radius * 0.3 - radius * 0.15,
-                cx + offset + radius * 0.15, cy + radius * 0.3 + radius * 0.15,
-                fill=cube_color(pid), outline="black"
-            )
+                for r0, r1 in segments:
+                    sx = p_start[0] + qx * r0
+                    sy = p_start[1] + qy * r0
+                    ex = p_start[0] + qx * r1
+                    ey = p_start[1] + qy * r1
+                    self.canvas.create_line(
+                        sx, sy, ex, ey, fill="black", width=1)
 
+        elif territory_type == "eagle":
+            # ワシは実線六角形描画
+            flat_points = [coord for pt in vertices for coord in pt]
+            self.canvas.create_polygon(
+                flat_points, outline="red", fill="", width=2)
 
-def cube_color(player_id):
-    """プレイヤーIDに対応する表示色"""
-    colors = {
-        "alpha": "#E74C3C", "beta": "#3498DB", "gamma": "#2ECC71",
-        "delta": "#F1C40F", "epsilon": "#9B59B6"
-    }
-    return colors.get(player_id, "gray")
+    def _draw_structure(self, x, y, type_, color):
+        """
+        建造物の見た目をタイプに応じて描画。
+        - ruin → 上向き三角形
+        - stone → フラットトップの正八角形
+        - その他 → 円
+        """
+        r = 16  # サイズ共通半径
+
+        if type_ == "ruin":
+            draw_regular_polygon(self.canvas, x, y, r, 3, fill_color=color)
+        elif type_ == "stone":
+            draw_regular_polygon(self.canvas, x, y, r, 4, fill_color=color)
+
+    def _draw_disc(self, x, y, player_id, offset=0):
+        """ディスクをプレイヤー色で描画（複数対応）"""
+        disc_colors = {
+            "alpha": "red", "beta": "green", "gamma": "blue",
+            "delta": "purple", "epsilon": "orange"
+        }
+        dx = offset * 5 - 10
+        r = 5
+        self.canvas.create_oval(x + dx - r, y + 15 - r, x + dx + r, y + 15 + r,
+                                fill=disc_colors.get(player_id, "gray"), outline="black")
+
+    def _draw_cube(self, x, y, player_id):
+        """キューブをプレイヤー色で描画（正方形）"""
+        cube_colors = {
+            "alpha": "red", "beta": "green", "gamma": "blue",
+            "delta": "purple", "epsilon": "orange"
+        }
+        r = 6
+        self.canvas.create_rectangle(x - r, y + 20 - r, x + r, y + 20 + r,
+                                     fill=cube_colors.get(player_id, "gray"), outline="black")
