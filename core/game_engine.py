@@ -27,6 +27,8 @@ class GameEngine:
         # ⏱ ゲームのターン状態を持つ GameState を生成
         self.state = GameState(player_ids)
 
+        self.label_map = label_map
+
     def current_player(self):
         """現在のプレイヤーインスタンスを取得"""
         return self.id_to_player[self.state.current_player]

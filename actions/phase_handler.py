@@ -32,17 +32,24 @@ class PhaseHandler:
         state = self.engine.state
         cell = self.engine.board.get_tile(coord)
 
+        if cell.get("cube"):
+            messagebox.showinfo("無効", "既にキューブが置いてあるマスは選択できません")
+            return
+
         # --- 質問フェーズ ---
-        if state.current_phase == "question":
+        if state.phase == "question":
             self._handle_question(current, cell, coord)
 
         # --- 配置フェーズ ---
-        elif state.current_phase == "place_disc":
+        elif state.phase == "place_disc":
             self._handle_disc_placement(current, cell, coord)
 
         # --- 探索フェーズ ---
-        elif state.current_phase == "search":
+        elif state.phase == "search":
             self._handle_search(current, cell, coord)
+
+        elif state.phase == "place_cube":
+            self._handle_cube_placement(current, cell, coord)
 
     def _handle_question(self, current, cell, coord):
         """
@@ -55,12 +62,20 @@ class PhaseHandler:
 
         # 判定結果に応じて配置フェーズへ
         if applies:
-            self.engine.state.set_phase("place_disc")
+            self.engine.board.place_disc(coord, current.id)
+            current.add_disc()
+            self._advance_turn()
         else:
-            self.engine.state.set_phase("search")
+            self.engine.board.place_cube(coord, current.id)
+            current
+            self.engine.state.set_phase("place_cube")
+            self.engine.state.exploration_target = coord
+            self.turn_label.config(
+                text=f"{display_name(current.id, current.display_name)} → キューブ配置フェーズ")
+            self.renderer.render(self.engine.board.tiles, self.rows, self.cols)
 
         self.turn_label.config(
-            text=f"{display_name(current.id, current.display_name)} - フェーズ: {self.engine.state.current_phase}")
+            text=f"{current.display_name} - フェーズ: {self.engine.state.phase}")
 
     def _handle_disc_placement(self, current, cell, coord):
         """
@@ -70,6 +85,21 @@ class PhaseHandler:
         if success:
             current.add_disc()
             self._advance_turn()
+
+    def _handle_cube_placement(self, current, cell, coord):
+        """
+        キューブ配置フェーズの処理：探索フェーズへ進む
+        """
+        applies = HintEvaluator.hint_applies(
+            cell, current.hint, self.engine.board.tiles)
+
+        if applies:
+            messagebox.showinfo("配置不可", "自分のヒントに合致するマスにはキューブを置けません")
+            return
+
+        self.engine.board.place_cube(coord, current.id)
+        current.add_cube()
+        self._advance_turn()
 
     def _handle_search(self, current, cell, coord):
         """
@@ -99,5 +129,5 @@ class PhaseHandler:
         self.engine.state.set_phase("question")
         current = self.engine.current_player()
         self.turn_label.config(
-            text=f"{display_name(current.id, current.display_name)} のターン")
+            text=f"{display_name(current.id, self.engine.label_map)} のターン")
         self.renderer.render(self.engine.board.tiles, self.rows, self.cols)

@@ -75,10 +75,22 @@ def main():
 
     # 🖱 クリック処理
     def on_click(event):
-        coord = pixel_to_cell_coord(event.x, event.y, radius, canvas)
+        coord = pixel_to_cell_coord(
+            event.x, event.y, radius, margin_x=margin_x, margin_y=margin_y)
+        print(f"[DEBUG] クリック座標: ({event.x}, {event.y}) → マス座標: {coord}")
         handler.handle_click(coord)
 
     canvas.bind("<Button-1>", on_click)
+
+    def on_motion(event):
+        coord = pixel_to_cell_coord(
+            event.x, event.y, radius, margin_x=margin_x, margin_y=margin_y)
+        if engine.board.is_valid_coord(coord):
+            renderer.highlight_cell(coord)
+        else:
+            renderer.clear_highlight()
+
+    canvas.bind("<Motion>", on_motion)
 
     # 🔘 質問・探索ボタン（下部配置）
     def set_phase_question():

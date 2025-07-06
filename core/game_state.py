@@ -38,6 +38,17 @@ class GameState:
         """現在ターンのプレイヤーIDを返す"""
         return self.players[self.current_index]
 
+    def set_phase(self, phase_name):
+        """
+        ゲームフェーズを更新する
+        有効: "question", "place_disc", "search", "place_cube", "end"
+        """
+        allowed = {"question", "place_disc", "search", "place_cube", "end"}
+        if phase_name in allowed:
+            self.phase = phase_name
+        else:
+            raise ValueError(f"不正なフェーズ指定: {phase_name}")
+
     def next_player(self):
         """手番を次のプレイヤーへ進める"""
         self.current_index = (self.current_index + 1) % self.n_players
