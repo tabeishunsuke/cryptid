@@ -43,7 +43,8 @@ class GameState:
         ゲームフェーズを更新する
         有効: "question", "place_disc", "search", "place_cube", "end"
         """
-        allowed = {"question", "place_disc", "search", "place_cube", "end"}
+        allowed = {"question", "place_disc",
+                   "search", "place_cube", "end", None}
         if phase_name in allowed:
             self.phase = phase_name
         else:

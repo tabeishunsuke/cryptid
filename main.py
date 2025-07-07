@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import messagebox
 from core.map_config_loader import MapConfigLoader
 from core.hint_loader import HintLoader
 from core.game_engine import GameEngine
@@ -58,7 +59,31 @@ def main():
     # 🎮 ゲームエンジン・描画エンジン初期化
     engine = GameEngine(player_ids, hints, board_data, label_map)
     renderer = BoardRenderer(canvas=None, terrain_imgs=terrain_imgs,
-                             radius=radius, margin_x=margin_x, margin_y=margin_y)
+                             radius=radius, margin_x=margin_x, margin_y=margin_y, player_lookup=engine.id_to_player)
+
+    # プレイヤー情報ビュー
+    info_frame = tk.Frame(root)
+    info_frame.pack(side=tk.RIGHT, padx=20, pady=0)
+
+    player_labels = {}  # プレイヤーラベルを保持する辞書
+
+    for pid in player_ids:
+        player = engine.id_to_player[pid]
+        display = label_map[pid]
+        label = tk.Label(
+            info_frame,
+            text=display,
+            font=("Helvetica", 12),
+            fg=player.color
+        )
+        label.pack(anchor="n", pady=0)
+        player_labels[pid] = label
+
+    def update_player_labels():
+        current_pid = engine.state.current_player
+        for pid, label in player_labels.items():
+            weight = "bold" if pid == current_pid else "normal"
+            label.config(font=("Helvetica", 12, weight))
 
     # 🖼 キャンバス生成（中央配置）
     canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
@@ -68,10 +93,11 @@ def main():
 
     # 💡 初期ターン表示
     turn_label.config(text=f"{label_map[engine.state.current_player]} のターン")
+    update_player_labels()
 
     # 🔀 ゲームフェーズ制御
     handler = PhaseHandler(engine, canvas, root, turn_label,
-                           terrain_imgs, radius, rows, cols, renderer)
+                           terrain_imgs, radius, rows, cols, renderer, update_labels=update_player_labels)
 
     # 🖱 クリック処理
     def on_click(event):
@@ -94,11 +120,21 @@ def main():
 
     # 🔘 質問・探索ボタン（下部配置）
     def set_phase_question():
+        if engine.state.phase == "place_cube":
+            messagebox.showwarning(
+                "無効な操作", "キューブ配置フェーズ中は質問フェーズに移行できません")
+            print("[DEBUG] キューブ配置フェーズ中は質問フェーズに移行不可")
+            return
         engine.state.set_phase("question")
         turn_label.config(
             text=f"{label_map[engine.state.current_player]} - 質問フェーズ")
 
     def set_phase_search():
+        if engine.state.phase == "place_cube":
+            messagebox.showwarning(
+                "無効な操作", "キューブ配置フェーズ中は探索フェーズに移行できません")
+            print("[DEBUG] キューブ配置フェーズ中は探索フェーズに移行不可")
+            return
         engine.state.set_phase("search")
         turn_label.config(
             text=f"{label_map[engine.state.current_player]} - 探索フェーズ")

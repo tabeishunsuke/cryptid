@@ -12,12 +12,13 @@ class BoardRenderer:
     地形・構造物・トークンを描画する。
     """
 
-    def __init__(self, canvas, terrain_imgs, radius, margin_x=0, margin_y=0):
+    def __init__(self, canvas, terrain_imgs, radius, margin_x=0, margin_y=0, player_lookup=None):
         self.canvas = canvas
         self.terrain_imgs = terrain_imgs
         self.radius = radius
         self.margin_x = margin_x
         self.margin_y = margin_y
+        self.player_lookup = player_lookup or {}  # ← プレイヤーID → Playerインスタンス
         self.hovered_cell = None  # ホバー中のマス座標
 
     def render(self, tile_data, rows, cols):
@@ -84,29 +85,31 @@ class BoardRenderer:
         if type_ == "ruin":
             draw_regular_polygon(self.canvas, x, y, r, 3, fill_color=color)
         elif type_ == "stone":
-            draw_regular_polygon(self.canvas, x, y, r, 4, fill_color=color)
+            draw_regular_polygon(self.canvas, x, y, r, 8, fill_color=color)
 
     def _draw_disc(self, x, y, player_id, offset=0):
-        disc_colors = {
-            "alpha": "red", "beta": "green", "gamma": "blue",
-            "delta": "purple", "epsilon": "orange"
-        }
+        player = self.player_lookup.get(player_id)
+        if not player:
+            print(f"[WARN] player_id {player_id} → 色不明（grayで描画）")
+        color = getattr(player, 'color', "gray")
+
         dx = offset * 5 - 10
         r = 5
         self.canvas.create_oval(
             x + dx - r, y + 15 - r, x + dx + r, y + 15 + r,
-            fill=disc_colors.get(player_id, "gray"), outline="black"
+            fill=color, outline="black"
         )
 
     def _draw_cube(self, x, y, player_id):
-        cube_colors = {
-            "alpha": "red", "beta": "green", "gamma": "blue",
-            "delta": "purple", "epsilon": "orange"
-        }
+        player = self.player_lookup.get(player_id)
+        if not player:
+            print(f"[WARN] player_id {player_id} → 色不明（grayで描画）")
+        color = getattr(player, 'color', "gray")
+
         r = 6
         self.canvas.create_rectangle(
             x - r, y + 20 - r, x + r, y + 20 + r,
-            fill=cube_colors.get(player_id, "gray"), outline="black"
+            fill=color, outline="black"
         )
 
     def highlight_cell(self, coord):

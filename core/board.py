@@ -26,6 +26,8 @@ class Board:
         return HintEvaluator.hint_applies(cell, hint, self.tiles)
 
     def place_disc(self, coord, player_id):
+        print(f"[DEBUG] place_disc 呼び出し: coord={coord}, player_id={player_id}")
+
         """ディスク配置（重複防止）"""
         cell = self.get_tile(coord)
         if not cell:
@@ -36,6 +38,8 @@ class Board:
         return True
 
     def place_cube(self, coord, player_id):
+        print(f"[DEBUG] place_cube 呼び出し: coord={coord}, player_id={player_id}")
+
         """キューブ配置（既存キューブがある場合は配置不可）"""
         cell = self.get_tile(coord)
         if not cell or cell.get("cube") is not None:

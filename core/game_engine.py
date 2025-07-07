@@ -16,11 +16,16 @@ class GameEngine:
         self.board = Board(board_data)
 
         # 🎭 プレイヤーの初期化（ヒントと表示名の付与）
+        preset_colors = {"alpha": "red", "beta": "green",
+                         "gamma": "blue", "delta": "purple", "epsilon": "orange"}
+
         self.players = []
         self.id_to_player = {}
+
         for i, pid in enumerate(player_ids):
             display = label_map.get(pid, pid) if label_map else pid
-            player = Player(pid, hints[i], display_name=display)
+            color = preset_colors.get(pid, "gray")  # デフォルト色は灰色
+            player = Player(pid, hints[i], display_name=display, color=color)
             self.players.append(player)
             self.id_to_player[pid] = player
 
