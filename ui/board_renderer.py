@@ -45,11 +45,12 @@ class BoardRenderer:
                     x, y, cell["structure"], cell["structure_color"]
                 )
 
-            for i, pid in enumerate(cell.get("discs", [])):
-                self._draw_disc(x, y, pid, offset=i)
-
             if cell.get("cube"):
                 self._draw_cube(x, y, cell["cube"])
+
+            for i, pid in enumerate(cell.get("discs", [])):
+                self._draw_disc(x, y, pid, offset=i,
+                                total_discs=len(cell["discs"]))
 
     def _draw_territory(self, x, y, territory_type):
         r = self.radius * 0.8
@@ -87,16 +88,21 @@ class BoardRenderer:
         elif type_ == "stone":
             draw_regular_polygon(self.canvas, x, y, r, 8, fill_color=color)
 
-    def _draw_disc(self, x, y, player_id, offset=0):
+    def _draw_disc(self, x, y, player_id, offset=0, total_discs=1):
         player = self.player_lookup.get(player_id)
-        if not player:
-            print(f"[WARN] player_id {player_id} → 色不明（grayで描画）")
         color = getattr(player, 'color', "gray")
 
-        dx = offset * 5 - 10
-        r = 5
+        r = 8
+        diameter = r * 2
+
+        # 横幅全体を計算し、中央基準で左から配置
+        center_offset = offset - (total_discs - 1) / 2
+        disc_x = x + center_offset * diameter
+
+        disc_y = y + 5  # キューブと合わせる高さ（調整可）
+
         self.canvas.create_oval(
-            x + dx - r, y + 15 - r, x + dx + r, y + 15 + r,
+            disc_x - r, disc_y - r, disc_x + r, disc_y + r,
             fill=color, outline="black"
         )
 
@@ -106,9 +112,9 @@ class BoardRenderer:
             print(f"[WARN] player_id {player_id} → 色不明（grayで描画）")
         color = getattr(player, 'color', "gray")
 
-        r = 6
+        r = 10
         self.canvas.create_rectangle(
-            x - r, y + 20 - r, x + r, y + 20 + r,
+            x - r, y + 5 - r, x + r, y + 5 + r,
             fill=color, outline="black"
         )
 

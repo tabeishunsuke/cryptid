@@ -173,11 +173,12 @@ def main():
 
     # 🔘 質問・探索ボタン（下部配置）
     def set_phase_question():
-        if engine.state.phase == "place_cube":
+        if engine.state.current_action == "place_cube":
             messagebox.showwarning(
                 "無効な操作", "キューブ配置フェーズ中は質問フェーズに移行できません")
             print("[DEBUG] キューブ配置フェーズ中は質問フェーズに移行不可")
             return
+
         engine.state.current_action = "question"
         handler.update_turn_label()
         current_pid = engine.state.current_player
@@ -186,11 +187,12 @@ def main():
             text=f"{label_map[engine.state.current_player]} - 質問フェーズ", fg=color)
 
     def set_phase_search():
-        if engine.state.phase == "place_cube":
+        if engine.state.current_action == "place_cube":
             messagebox.showwarning(
-                "無効な操作", "キューブ配置フェーズ中は探索フェーズに移行できません")
+                "無効な操作", "キューブを置いてください")
             print("[DEBUG] キューブ配置フェーズ中は探索フェーズに移行不可")
             return
+
         engine.state.current_action = "search"
         handler.update_turn_label()
         current_pid = engine.state.current_player
