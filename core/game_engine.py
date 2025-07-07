@@ -11,20 +11,26 @@ class GameEngine:
     - ゲーム状態の保持（current_player, phase など）
     """
 
-    def __init__(self, player_ids, hints, board_data, label_map=None):
+    def __init__(self, player_ids, hints, board_data, label_map=None, color_map=None):
         # 🔧 ボード構築（盤面データを元に Board インスタンス化）
         self.board = Board(board_data)
 
         # 🎭 プレイヤーの初期化（ヒントと表示名の付与）
-        preset_colors = {"alpha": "red", "beta": "green",
-                         "gamma": "blue", "delta": "purple", "epsilon": "orange"}
+        fixed_player_colors = {
+            "alpha": "red",
+            "beta": "green",
+            "gamma": "blue",
+            "delta": "purple",
+            "epsilon": "orange"
+        }
 
         self.players = []
         self.id_to_player = {}
 
         for i, pid in enumerate(player_ids):
             display = label_map.get(pid, pid) if label_map else pid
-            color = preset_colors.get(pid, "gray")  # デフォルト色は灰色
+            color = color_map.get(
+                pid, "gray") if color_map else "gray"  # デフォルト色は灰色
             player = Player(pid, hints[i], display_name=display, color=color)
             self.players.append(player)
             self.id_to_player[pid] = player

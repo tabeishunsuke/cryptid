@@ -10,18 +10,61 @@ from ui.image_loader import load_terrain_images
 from ui.labels import generate_display_labels
 
 
+def find_solution_tile(engine):
+    board = engine.board
+    all_coords = list(board.tiles.keys())
+    players = engine.players
+
+    # プレイヤーごとのヒントを表示
+    print("\n[DEBUG] プレイヤーのヒント一覧:")
+    for player in players:
+        print(f"  - {player.display_name}（{player.id}）: {player.hint}")
+
+    # 正解候補マスを探索
+    solution_tiles = []
+    for coord in all_coords:
+        cell = board.get_tile(coord)
+        applies_all = True
+        for player in players:
+            applies = board.apply_hint(coord, player.hint)
+            if not applies:
+                applies_all = False
+                break
+        if applies_all:
+            solution_tiles.append(coord)
+
+    # 🔍 出力
+    print(f"\n[DEBUG] 正解候補マス（全ヒントに一致）:")
+    for coord in solution_tiles:
+        print(f"  → {coord}")
+
+
 def main():
     # 1️⃣ マップ構成とヒント情報をロード
     map_loader = MapConfigLoader()
     hint_loader = HintLoader()
 
-    # 使用マップIDを取得
-    map_id = map_loader.get_available_map_ids()[0]
+    # 使用マップIDとプレイヤー数を指定
+    map_id = map_loader.get_available_map_ids()[1]
+    player_count = 4
     board_data = map_loader.load_map(map_id)
 
+    # プレイヤー情報を取得
+    raw_players = hint_loader.get_players_for_map(map_id, player_count)
+
     # プレイヤー情報とヒントを取得
-    player_ids, hints = hint_loader.get_hint_for_map(map_id)
-    label_map = generate_display_labels(player_ids)
+    player_ids = [p["id"] for p in raw_players]
+    preset_colors = {
+        "player1": "red",
+        "player2": "green",
+        "player3": "blue",
+        "player4": "orange",
+        "player5": "purple"
+    }
+    hints = [p["hint"] for p in raw_players]
+    books = [p["book"] for p in raw_players]
+
+    label_map = {p["id"]: p["id"] for p in raw_players}
 
     # 2️⃣ GUI初期化（Tkinterウィンドウ）
     root = tk.Tk()
@@ -57,7 +100,14 @@ def main():
     turn_label.pack(side=tk.TOP, pady=10)
 
     # 🎮 ゲームエンジン・描画エンジン初期化
-    engine = GameEngine(player_ids, hints, board_data, label_map)
+    engine = GameEngine(player_ids, hints, board_data,
+                        label_map, color_map=preset_colors)
+
+    # 🕹 ゲーム状態を初期化（開始直後）
+    engine.state.set_phase("active")
+    engine.state.current_action = None
+
+    find_solution_tile(engine)  # 正解候補マスを探索
     renderer = BoardRenderer(canvas=None, terrain_imgs=terrain_imgs,
                              radius=radius, margin_x=margin_x, margin_y=margin_y, player_lookup=engine.id_to_player)
 
@@ -92,7 +142,10 @@ def main():
     renderer.render(engine.board.tiles, rows, cols)
 
     # 💡 初期ターン表示
-    turn_label.config(text=f"{label_map[engine.state.current_player]} のターン")
+    current_pid = engine.state.current_player
+    color = engine.id_to_player[current_pid].color
+    turn_label.config(
+        text=f"{label_map[engine.state.current_player]} のターン", fg=color)
     update_player_labels()
 
     # 🔀 ゲームフェーズ制御
@@ -125,9 +178,12 @@ def main():
                 "無効な操作", "キューブ配置フェーズ中は質問フェーズに移行できません")
             print("[DEBUG] キューブ配置フェーズ中は質問フェーズに移行不可")
             return
-        engine.state.set_phase("question")
+        engine.state.current_action = "question"
+        handler.update_turn_label()
+        current_pid = engine.state.current_player
+        color = engine.id_to_player[current_pid].color
         turn_label.config(
-            text=f"{label_map[engine.state.current_player]} - 質問フェーズ")
+            text=f"{label_map[engine.state.current_player]} - 質問フェーズ", fg=color)
 
     def set_phase_search():
         if engine.state.phase == "place_cube":
@@ -135,9 +191,12 @@ def main():
                 "無効な操作", "キューブ配置フェーズ中は探索フェーズに移行できません")
             print("[DEBUG] キューブ配置フェーズ中は探索フェーズに移行不可")
             return
-        engine.state.set_phase("search")
+        engine.state.current_action = "search"
+        handler.update_turn_label()
+        current_pid = engine.state.current_player
+        color = engine.id_to_player[current_pid].color
         turn_label.config(
-            text=f"{label_map[engine.state.current_player]} - 探索フェーズ")
+            text=f"{label_map[engine.state.current_player]} - 探索フェーズ", fg=color)
 
     btn_frame = tk.Frame(root)
     btn_frame.pack(side=tk.BOTTOM, pady=10)

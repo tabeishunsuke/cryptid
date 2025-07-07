@@ -83,33 +83,50 @@ class HintLoader:
                 except Exception as e:
                     print(f"[Map Hint Load Error] {e} → 行: {row}")
 
-    def get_hint_for_map(self, map_id):
+    def get_players_for_map(self, map_id, player_count):
         """
-        指定map_idに対応するプレイヤーID順とヒント情報を返す。
+        指定マップIDとプレイヤー数に応じたプレイヤー情報リストを返す。
 
         Returns:
-            player_ids: [str] 使用プレイヤー順
-            hint_list: [dict] generic_hintsベースのヒント内容
+            List[Dict] → [{id: "player1", book: "alpha", hint: {...}}, ...]
         """
-        if map_id not in self.map_hint_mapping:
-            raise ValueError(f"マップID {map_id} に対する冊子情報が見つかりません")
+        order = ["alpha", "beta", "gamma", "delta", "epsilon"]
 
-        # 冊子使用ページ
-        hint_pos_map = self.map_hint_mapping[map_id]
+        with open(self.player_hint_csv, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                m_id = int(row["map_id"].strip())
+                p_count = int(row["players"].strip())
+                if m_id != map_id or p_count != player_count:
+                    continue
 
-        player_ids = list(hint_pos_map.keys())[:self.map_player_count[map_id]]
-        hint_list = []
+                players = []
+                idx = 0
+                for book in order:
+                    val = row.get(book, "").strip()
+                    if val.isdigit():
+                        position = int(val)
+                        if position not in self.book_orders:
+                            raise ValueError(
+                                f"冊子ページ {position} が book_orders に存在しません")
 
-        for pid in player_ids:
-            position = hint_pos_map.get(pid)
-            if position not in self.book_orders:
-                raise ValueError(f"冊子ページ {position} の内容が見つかりません（プレイヤー {pid}）")
+                        hint_id = self.book_orders[position].get(book)
+                        if hint_id not in self.generic_hints:
+                            raise ValueError(
+                                f"ヒントID {hint_id} が generic_hints に存在しません")
 
-            hint_id = self.book_orders[position].get(pid)
-            if hint_id not in self.generic_hints:
-                raise ValueError(f"ヒントID {hint_id} が見つかりません（プレイヤー {pid}）")
+                        hint = self.generic_hints[hint_id]
+                        players.append({
+                            "id": f"player{idx + 1}",
+                            "book": book,
+                            "hint": hint
+                        })
+                        idx += 1
 
-            hint = self.generic_hints[hint_id]
-            hint_list.append(hint)
+                if len(players) != player_count:
+                    raise ValueError(f"{player_count}人分のプレイヤーデータが構成されませんでした")
 
-        return player_ids, hint_list
+                return players
+
+        raise ValueError(
+            f"map_id={map_id}, player_count={player_count} に一致する行が見つかりません")

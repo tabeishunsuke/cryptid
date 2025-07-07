@@ -2,31 +2,36 @@ class GameState:
     """
     ゲーム全体の進行状態を管理するクラス。
 
-    管理する要素:
-        - プレイヤーの順番・現在のターン
-        - 現在のフェーズとアクション種別
-        - キューブ／ディスクの配置数
-        - 質問／探索に関するターゲットプレイヤーや配置フェーズ
-        - アクション履歴（ログ）と再配置対象など
-
-    フェーズ一覧:
-        "init"   : 初期化中（まだ開始していない）
-        "main"   : 通常プレイ中
-        "end"    : 終了後（勝者決定）
+    - ゲームフェーズ (phase): 全体進行管理 → "init", "active", "end"
+    - プレイヤーアクション (current_action): ターン内操作 → "question", "search", "place_disc", "place_cube"
     """
+    # ゲームフェーズ定義（進行管理用）
+    PHASE_INIT = "init"
+    PHASE_ACTIVE = "active"
+    PHASE_END = "end"
+    ALLOWED_PHASES = {PHASE_INIT, PHASE_ACTIVE, PHASE_END}
 
-    def __init__(self, player_colors):
+    # プレイヤーアクション定義（操作フェーズ用）
+    ACTION_QUESTION = "question"
+    ACTION_SEARCH = "search"
+    ACTION_PLACE_DISC = "place_disc"
+    ACTION_PLACE_CUBE = "place_cube"
+    ALLOWED_ACTIONS = {ACTION_QUESTION, ACTION_SEARCH,
+                       ACTION_PLACE_DISC, ACTION_PLACE_CUBE}
+
+    def __init__(self, player_ids):
         # プレイヤーID例: ["alpha", "beta", "gamma"]
-        self.players = player_colors
-        self.n_players = len(player_colors)
+        self.players = player_ids                  # プレイヤーIDのリスト
+        self.n_players = len(player_ids)          # プレイヤー数
         self.current_index = 0                        # ターン中プレイヤーのインデックス
-        # "question", "search", "place_cube", etc.
-        self.current_action = None
-        self.target_player = None                     # 質問対象（インデックス）
-        self.phase = "init"                           # "init", "main", "end"
 
-        self.cube_count = {p: 0 for p in player_colors}   # キューブの配置数
-        self.disk_count = {p: 0 for p in player_colors}   # ディスクの配置数
+        # "question", "search", "place_cube", etc.
+        self.phase = GameState.PHASE_INIT  # ゲームフェーズ（初期状態は "init"）
+        self.current_action = None                     # 現在のアクションフェーズ
+        self.target_player = None                      # 質問対象プレイヤーのインデックス
+
+        self.cube_count = {p: 0 for p in player_ids}   # キューブの配置数
+        self.disk_count = {p: 0 for p in player_ids}   # ディスクの配置数
 
         self.history = []                             # ログ履歴（プレイ中の記録）
         self.pending_explore = None                   # ディスク再配置フェーズ用の仮探索情報
@@ -39,16 +44,16 @@ class GameState:
         return self.players[self.current_index]
 
     def set_phase(self, phase_name):
-        """
-        ゲームフェーズを更新する
-        有効: "question", "place_disc", "search", "place_cube", "end"
-        """
-        allowed = {"question", "place_disc",
-                   "search", "place_cube", "end", None}
-        if phase_name in allowed:
+        if phase_name in GameState.ALLOWED_PHASES:
             self.phase = phase_name
         else:
-            raise ValueError(f"不正なフェーズ指定: {phase_name}")
+            raise ValueError(f"[GameState] 不正なフェーズ指定: '{phase_name}'")
+
+    def set_action(self, action_name):
+        if action_name in GameState.ALLOWED_ACTIONS or action_name is None:
+            self.current_action = action_name
+        else:
+            raise ValueError(f"[GameState] 不正なアクション指定: '{action_name}'")
 
     def next_player(self):
         """手番を次のプレイヤーへ進める"""
@@ -58,12 +63,12 @@ class GameState:
 
     def begin_question(self, target_index):
         """質問フェーズの開始。対象プレイヤーのインデックスを設定"""
-        self.current_action = "question"
+        self.set_action(GameState.ACTION_QUESTION)
         self.target_player = target_index
 
     def begin_search(self):
         """探索フェーズを開始"""
-        self.current_action = "search"
+        self.set_action(GameState.ACTION_SEARCH)
 
     def log(self, message):
         """履歴ログに1件追加"""
@@ -73,10 +78,10 @@ class GameState:
         """ゲーム状態を初期化（リプレイ開始など）"""
         self.current_index = 0
         self.current_action = None
-        self.phase = "init"
+        self.set_phase(GameState.PHASE_INIT)
         self.cube_count = {p: 0 for p in self.players}
         self.disk_count = {p: 0 for p in self.players}
-        self.history = []
+        self.history.clear()
         self.pending_explore = None
         self.exploration_target = None
         self.reveal_index = 0

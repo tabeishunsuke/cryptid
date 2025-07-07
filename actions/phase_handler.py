@@ -34,8 +34,8 @@ class PhaseHandler:
         フェーズが未指定の場合は何も起こらない。
         """
         state = self.engine.state
-        if state.phase not in {"question", "place_disc", "search", "place_cube"}:
-            print(f"[DEBUG] フェーズ未設定のため無視: {state.phase}")
+        if self.engine.state.current_action not in {"question", "search", "place_cube", "place_disc"}:
+            print(f"[DEBUG] フェーズ未設定のため無視: {self.engine.state.current_action}")
             return
 
         if not self.engine.board.is_valid_coord(coord):
@@ -54,20 +54,20 @@ class PhaseHandler:
             messagebox.showinfo("無効", "既にキューブが置いてあるマスは選択できません")
             return
 
-        # --- 質問フェーズ ---
-        if state.phase == "question":
+        # 🎯 行動フェーズの分岐（phaseではなく current_action を使う）
+        action = state.current_action
+
+        if action == "question":
             self._handle_question(current, cell, coord)
-
-        # --- 配置フェーズ ---
-        elif state.phase == "place_disc":
+        elif action == "place_disc":
             self._handle_disc_placement(current, cell, coord)
-
-        # --- 探索フェーズ ---
-        elif state.phase == "search":
+        elif action == "search":
             self._handle_search(current, cell, coord)
-
-        elif state.phase == "place_cube":
+        elif action == "place_cube":
             self._handle_cube_placement(current, cell, coord)
+        else:
+            print(f"[DEBUG] 有効な行動フェーズではないため無視: {action}")
+            return
 
     def _handle_question(self, current, cell, coord):
         # 質問対象選択ダイアログを表示
@@ -124,25 +124,31 @@ class PhaseHandler:
 
         if applies:
             # ✅ 合致 → ディスク配置 → ターン終了
-            self.engine.board.place_disc(coord, asker.id)
-            asker.add_disc()
+            self.engine.board.place_disc(coord, target.id)
+            target.add_disc()
             print(f"[DEBUG] コマ配置: player_id={target.id}, coord={coord}")
 
+            print(
+                f"[LOG] {asker.display_name} → {target.display_name}: 合致 → ディスク配置")
             self.engine.state.log(
-                f"{self.engine.label_map[asker.id]} → {self.engine.label_map[target.id]}: 合致 → ディスク配置"
+                f"{asker.display_name} → {target.display_name}: 合致 → ディスク配置"
             )
             self._advance_turn()
         else:
             # ❌ 非合致 → 相手がキューブを配置し、質問者は次に自分のキューブを別マスに配置する
             self.engine.board.place_cube(coord, target.id)
             target.add_cube()
-            print(f"[DEBUG] コマ配置: player_id={asker.id}, coord={coord}")
+            print(
+                f"[DEBUG] コマ配置: player_id={target.display_name}, coord={coord}")
 
-            self.engine.state.set_phase("place_cube")  # 次は質問者のキューブ配置フェーズへ
+            self.engine.state.current_action = "place_cube"  # 次は質問者のキューブ配置フェーズへ
+            self.update_turn_label()
             self.engine.state.exploration_target = coord  # 対象座標を記録（UI表示などに使える）
 
+            print(
+                f"[LOG] {asker.display_name} → {target.display_name}: 非合致 → キューブ配置へ（質問者も配置）")
             self.engine.state.log(
-                f"{self.engine.label_map[asker.id]} → {self.engine.label_map[target.id]}: 非合致 → キューブ配置へ（質問者も配置）"
+                f"{asker.display_name} → {target.display_name}: 非合致 → キューブ配置へ（質問者も配置）"
             )
 
             # ターン表示更新
@@ -194,6 +200,13 @@ class PhaseHandler:
         """
         探索フェーズの処理：全プレイヤーのヒント照合
         """
+        # 自分のディスクが探索対象にある場合、ディスク配置フェーズへ移行
+        if current.id in cell.get("discs", []):
+            self.engine.state.current_action = "place_disc"
+            print(f"[DEBUG] {current.id} のディスクが探索対象にある → ディスク再配置フェーズへ")
+            return  # ⚠️ ディスク配置フェーズを優先し、探索処理はこの後
+
+        # 探索処理
         all_match = True
         for player in self.engine.players:
             if not HintEvaluator.hint_applies(cell, player.hint, self.engine.board.tiles):
@@ -215,12 +228,36 @@ class PhaseHandler:
         次のプレイヤーへターンを進め、フェーズを初期化
         """
         self.engine.next_turn()
-        self.engine.state.set_phase("question")
-        current = self.engine.current_player()
-        self.turn_label.config(
-            text=f"{display_name(current.id, self.engine.label_map)} のターン")
+
+        # 行動選択フェーズに戻す
+        self.engine.state.current_action = None
+        self.engine.state.set_phase("active")  # ゲーム進行フェーズは維持
 
         if self.update_labels:
             self.update_labels()
 
+        self.update_turn_label()  # ターン表示を更新
+
         self.renderer.render(self.engine.board.tiles, self.rows, self.cols)
+
+    def update_turn_label(self):
+        pid = self.engine.state.current_player
+        player = self.engine.id_to_player[pid]
+        label = self.engine.label_map[pid]
+        color = player.color
+        action = self.engine.state.current_action
+
+        if action == "question":
+            text = f"{label} - 質問フェーズ"
+        elif action == "search":
+            text = f"{label} - 探索フェーズ"
+        elif action == "place_disc":
+            text = f"{label} - ディスク配置フェーズ"
+        elif action == "place_cube":
+            text = f"{label} - キューブ配置フェーズ"
+        elif action is None:
+            text = f"{label} のターン"
+        else:
+            text = f"{label}（未定義フェーズ）"
+
+        self.turn_label.config(text=text, fg=color)
