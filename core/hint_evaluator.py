@@ -1,13 +1,19 @@
 class HintEvaluator:
     """
-    ヒントが盤面のセルに合致するかを判定する静的クラス。
-    地形・構造物・縄張り・距離などの条件に対応。
+    ヒントが盤面セルに合致するかどうかを判定するユーティリティクラス。
+
+    対応ヒント種別：
+    - 地形選択（terrain_choice / neg_terrain_choice）
+    - 地形の近接条件
+    - 構造物の近接条件（種類／色）
+    - 縄張りの近接条件
     """
 
     @staticmethod
     def offset_to_cube(col, row):
         """
-        hex座標 (offset) を cube座標に変換（距離計算に使用）
+        Hex座標系（offset） → Cube座標系への変換
+        - 距離計算で使用
         """
         x = col
         z = row - ((col - (col & 1)) // 2)
@@ -17,7 +23,7 @@ class HintEvaluator:
     @staticmethod
     def hex_distance(a, b):
         """
-        2つの座標間の hex 距離を計算（最大差分を使用）
+        Cube座標間の距離：3軸の最大差分を使用
         """
         x1, y1, z1 = HintEvaluator.offset_to_cube(*a)
         x2, y2, z2 = HintEvaluator.offset_to_cube(*b)
@@ -26,7 +32,8 @@ class HintEvaluator:
     @staticmethod
     def is_nearby(match, target, distance, board_data):
         """
-        指定された distance 以内に target 条件に合致するセルが存在するか
+        指定座標 `match` の周囲に `target` 条件に合致するセルが存在するか判定
+        - `target` は判定用のラムダ関数
         """
         coord = (match["col"], match["row"])
         for (cx, cy), other in board_data.items():
@@ -37,53 +44,71 @@ class HintEvaluator:
     @staticmethod
     def hint_applies(cell, hint, board_data):
         """
-        ヒントが指定セルに適用されるか判定
-        hint = {hint_type, param1, param2, text}
+        与えられたヒントがセル `cell` に適用されるか判定する。
+        ヒント形式：{hint_type, param1, param2, text}
         """
         hint_type = hint["hint_type"]
         p1 = hint["param1"]
         p2 = hint["param2"]
 
-        # 地形2択
+        # 地形2択（大文字小文字考慮）
         if hint_type == "terrain_choice":
-            return cell.get("terrain") in [p1, p2]
+            return cell.get("terrain", "").lower() in [p1.lower(), p2.lower()]
         elif hint_type == "neg_terrain_choice":
-            return cell.get("terrain") not in [p1, p2]
+            return cell.get("terrain", "").lower() not in [p1.lower(), p2.lower()]
 
-        # 地形の近接条件
+        # 地形近接
         elif hint_type == "adjacent_terrain":
-            return HintEvaluator.is_nearby(cell, lambda c: c.get("terrain") == p1, int(p2), board_data)
+            return HintEvaluator.is_nearby(
+                cell, lambda c: c.get("terrain", "").lower() == p1.lower(),
+                int(p2), board_data
+            )
         elif hint_type == "neg_adjacent_terrain":
-            return not HintEvaluator.is_nearby(cell, lambda c: c.get("terrain") == p1, int(p2), board_data)
+            return not HintEvaluator.is_nearby(
+                cell, lambda c: c.get("terrain", "").lower() == p1.lower(),
+                int(p2), board_data
+            )
 
-        # 構造物の種類や色に関する近接条件
+        # 構造物種類または色の近接判定
         elif hint_type == "adjacent_structure":
-            return HintEvaluator.is_nearby(cell, lambda c: c.get("structure") == p1, int(p2), board_data)
+            return HintEvaluator.is_nearby(
+                cell, lambda c: c.get("structure", "").lower() == p1.lower(),
+                int(p2), board_data
+            )
         elif hint_type == "neg_adjacent_structure":
-            return not HintEvaluator.is_nearby(cell, lambda c: c.get("structure") == p1, int(p2), board_data)
+            return not HintEvaluator.is_nearby(
+                cell, lambda c: c.get("structure", "").lower() == p1.lower(),
+                int(p2), board_data
+            )
         elif hint_type == "adjacent_structure_by_color":
             return HintEvaluator.is_nearby(
-                cell,
-                lambda c: isinstance(
-                    c.get("structure_color"), str) and c["structure_color"].lower() == p1.lower(),
-                int(p2),
-                board_data
+                cell, lambda c: c.get(
+                    "structure_color", "").lower() == p1.lower(),
+                int(p2), board_data
             )
         elif hint_type == "neg_adjacent_structure_by_color":
             return not HintEvaluator.is_nearby(
-                cell,
-                lambda c: isinstance(
-                    c.get("structure_color"), str) and c["structure_color"].lower() == p1.lower(),
-                int(p2),
-                board_data
+                cell, lambda c: c.get(
+                    "structure_color", "").lower() == p1.lower(),
+                int(p2), board_data
             )
 
-        # 縄張り関連の近接条件（territoriesに基づく）
+        # 縄張り近接
         elif hint_type == "adjacent_territory":
-            targets = [s.strip() for s in p1.split(",")]
-            return HintEvaluator.is_nearby(cell, lambda c: any(t in c.get("territories", []) for t in targets), int(p2), board_data)
+            targets = [t.strip().lower() for t in p1.split(",")]
+            return HintEvaluator.is_nearby(
+                cell,
+                lambda c: any(t in [tt.lower() for tt in c.get("territories", [])]
+                              for t in targets),
+                int(p2), board_data
+            )
         elif hint_type == "neg_adjacent_territory":
-            targets = [s.strip() for s in p1.split(",")]
-            return not HintEvaluator.is_nearby(cell, lambda c: any(t in c.get("territories", []) for t in targets), int(p2), board_data)
+            targets = [t.strip().lower() for t in p1.split(",")]
+            return not HintEvaluator.is_nearby(
+                cell,
+                lambda c: any(t in [tt.lower() for tt in c.get("territories", [])]
+                              for t in targets),
+                int(p2), board_data
+            )
 
-        return False  # 未定義のヒントタイプ
+        return False  # 未定義ヒントタイプは常に不一致

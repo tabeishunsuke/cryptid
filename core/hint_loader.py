@@ -3,10 +3,14 @@ import csv
 
 class HintLoader:
     """
-    Cryptidのヒント情報ローダー。
-    - map_player_hints.csv: マップIDごとの冊子使用ページ定義
-    - book_orders.csv: 冊子ページ → 冊子ごとの hint_id 定義
-    - generic_hints.csv: hint_id → ヒントの詳細内容
+    Cryptid ヒント構成ローダー。
+
+    担当する役割：
+    - generic_hints.csv: ヒントの詳細（種類／パラメータ／説明文）
+    - book_orders.csv: 各冊子ページにおける冊子ごとの hint_id
+    - map_player_hints.csv: マップIDごとの冊子ページ指定 → プレイヤー順で hint を構成
+
+    主な用途：マップIDとプレイヤー数からプレイヤーごとのヒントを生成
     """
 
     def __init__(self,
@@ -17,19 +21,18 @@ class HintLoader:
         self.book_order_csv = book_order_csv
         self.player_hint_csv = player_hint_csv
 
-        self.generic_hints = {}           # hint_id → hint情報
-        self.book_orders = {}             # position → {alpha〜epsilon: hint_id}
-        self.map_hint_mapping = {}        # map_id → {alpha〜epsilon: position}
+        self.generic_hints = {}           # hint_id → hint dict
+        self.book_orders = {}             # position → {alpha, beta...: hint_id}
+        self.map_hint_mapping = {}        # map_id → {alpha, beta...: position}
         self.map_player_count = {}        # map_id → プレイヤー数
 
-        # 初期化
         self._load_generic_hints()
         self._load_book_orders()
         self._load_player_hints()
 
     def _load_generic_hints(self):
         """
-        generic_hints.csv を読み込み、hint_id をキーに辞書構造へ。
+        generic_hints.csv を読み込み、hint_id をキーにヒント内容を保持
         """
         with open(self.generic_hint_csv, encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -47,7 +50,7 @@ class HintLoader:
 
     def _load_book_orders(self):
         """
-        book_orders.csv を読み込み、position（冊子ページ）ごとの冊子ごとの hint_id を格納。
+        book_orders.csv を読み込み、position（冊子ページ）ごとの冊子ごとの hint_id を格納
         """
         with open(self.book_order_csv, encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -65,7 +68,7 @@ class HintLoader:
 
     def _load_player_hints(self):
         """
-        map_player_hints.csv を読み込み、map_idごとの冊子使用ページを保持。
+        map_player_hints.csv を読み込み、マップIDごとの冊子使用ページとプレイヤー数を保持
         """
         with open(self.player_hint_csv, encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -85,10 +88,14 @@ class HintLoader:
 
     def get_players_for_map(self, map_id, player_count):
         """
-        指定マップIDとプレイヤー数に応じたプレイヤー情報リストを返す。
+        指定マップIDとプレイヤー数に対応するプレイヤー情報のリストを返す。
 
-        Returns:
-            List[Dict] → [{id: "player1", book: "alpha", hint: {...}}, ...]
+        形式：
+        [
+            {"id": "player1", "book": "alpha", "hint": {...}},
+            {"id": "player2", "book": "beta", "hint": {...}},
+            ...
+        ]
         """
         order = ["alpha", "beta", "gamma", "delta", "epsilon"]
 
@@ -109,7 +116,6 @@ class HintLoader:
                         if position not in self.book_orders:
                             raise ValueError(
                                 f"冊子ページ {position} が book_orders に存在しません")
-
                         hint_id = self.book_orders[position].get(book)
                         if hint_id not in self.generic_hints:
                             raise ValueError(

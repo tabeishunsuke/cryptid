@@ -4,26 +4,27 @@ import os
 
 class MapConfigLoader:
     """
-    地形構成（blockA〜F）を読み込んで盤面を構築するローダークラス。
-    - map_config.csv で各マップIDのブロック配置と回転情報を管理
-    - 各ブロックCSVから座標・地形・縄張りを読み込む
-    - structures.csv で構造物を盤面に追加する
+    地形構成（ブロックA〜F）を読み込んで盤面を構築するローダー。
+    - map_config.csv: 各マップIDに対応するブロック配置と回転情報
+    - assets/blocks/*.csv: 各ブロックの地形・縄張り情報
+    - structures.csv: 構造物の種類と配置座標を追加
     """
 
     def __init__(self,
                  map_csv="assets/configs/map_config.csv",
                  blocks_dir="assets/blocks/",
                  structures_csv="assets/configs/structures.csv"):
-        self.map_csv = map_csv                    # ブロック構成CSV（マップごとの配置情報）
-        self.blocks_dir = blocks_dir              # ブロックCSVの保存ディレクトリ
-        self.structures_csv = structures_csv      # 構造物配置CSV
-        self.maps = {}                            # map_id → {positions, tiles}
-        self._load_maps()                         # マップ構築処理
-        self._load_structures()                   # 構造物読み込み処理
+        self.map_csv = map_csv
+        self.blocks_dir = blocks_dir
+        self.structures_csv = structures_csv
+        self.maps = {}  # map_id → {positions, tiles}
+
+        self._load_maps()
+        self._load_structures()
 
     def _load_maps(self):
         """
-        マップIDごとのブロック配置を読み込み、タイルデータ（盤面構成）を構築する。
+        マップ構成CSVからブロック配置と回転を読み込み、全マップの盤面を生成する。
         """
         with open(self.map_csv, encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -36,7 +37,7 @@ class MapConfigLoader:
                     positions.append((block, rot))
                 self.maps[mid] = {"positions": positions, "tiles": {}}
 
-        # 各マップごとにブロックCSVを読み込む
+        # 🔁 各マップごとの構成からブロックデータ読込 → タイル展開
         for mid, map_info in self.maps.items():
             for i, (block, rot) in enumerate(map_info["positions"]):
                 path = os.path.join(self.blocks_dir, f"{block}.csv")
@@ -51,7 +52,6 @@ class MapConfigLoader:
                         row_ = int(row["row"])
                         terrain = row["terrain"].strip()
                         territory = row.get("territory", "").strip()
-
                         tiles.append({
                             "col": col,
                             "row": row_,
@@ -59,42 +59,38 @@ class MapConfigLoader:
                             "territory": territory
                         })
 
-                # 🎯 回転処理（180度反転）← rot = 1 の場合
+                # 🔄 rot==1 の場合は180度反転（左右＋上下反転）
                 if rot == 1:
                     tiles = [{
-                        "col": 5 - t["col"],  # 0-indexed → 最大col=5
+                        "col": 5 - t["col"],  # 最大col=5（0-indexed）
                         "row": 2 - t["row"],  # 最大row=2
                         "terrain": t["terrain"],
                         "territory": t["territory"]
                     } for t in tiles]
 
-                # 🎯 配置位置計算（縦3 × 横2 → 6箇所にオフセット）
-                col_offset = (i % 2) * 6      # 0 or 6
-                row_offset = (i // 2) * 3     # 0, 3, 6
+                # 🧮 ブロック配置位置のオフセット計算
+                col_offset = (i % 2) * 6  # 偶奇で横方向：0 or 6
+                row_offset = (i // 2) * 3  # 3行ブロックごとに上下方向：0, 3, 6
 
                 for t in tiles:
                     col = t["col"] + col_offset
                     row_ = t["row"] + row_offset
                     key = (col, row_)
-
                     cell = {
                         "col": col,
                         "row": row_,
                         "terrain": t["terrain"],
-                        "territories": [],
+                        "territories": [t["territory"]] if t["territory"] else [],
                         "structure": None,
                         "structure_color": None,
                         "discs": [],
                         "cube": None
                     }
-                    if t["territory"]:
-                        cell["territories"].append(t["territory"])
-
                     map_info["tiles"][key] = cell
 
     def _load_structures(self):
         """
-        構造物CSVから各マップに構造物タイプ・色を追加する。
+        構造物CSVから、各マップの該当セルに構造物情報（種類／色）を追加する。
         """
         with open(self.structures_csv, encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -106,13 +102,9 @@ class MapConfigLoader:
                     self.maps[mid]["tiles"][key]["structure_color"] = row["color"].strip()
 
     def get_available_map_ids(self):
-        """
-        利用可能なマップIDの一覧を返す。
-        """
+        """使用可能なマップID一覧を返す"""
         return sorted(self.maps.keys())
 
     def load_map(self, map_id):
-        """
-        指定した map_id に対応する盤面データ（tiles）を返す。
-        """
+        """指定マップIDに対応するタイル情報を返す"""
         return self.maps.get(map_id, {}).get("tiles", {})
