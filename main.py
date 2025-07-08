@@ -5,31 +5,9 @@ from core.hint_loader import HintLoader
 from core.game_engine import GameEngine
 from ui.board_renderer import BoardRenderer
 from actions.phase_handler import PhaseHandler
-from ui.canvas_utils import pixel_to_cell_coord
+from utils.canvas_utils import pixel_to_cell_coord
 from ui.image_loader import load_terrain_images
-
-
-def find_solution_tile(engine):
-    """
-    ゲーム開始時に、すべてのヒントに合致する正解候補マスを探索・表示するデバッグ用関数
-    """
-    board = engine.board
-    all_coords = list(board.tiles.keys())
-    players = engine.players
-
-    print("\n[DEBUG] プレイヤーのヒント一覧:")
-    for player in players:
-        print(f"  - {player.display_name}（{player.id}）: {player.hint}")
-
-    solution_tiles = []
-    for coord in all_coords:
-        cell = board.get_tile(coord)
-        if all(board.apply_hint(coord, p.hint) for p in players):
-            solution_tiles.append(coord)
-
-    print(f"\n[DEBUG] 正解候補マス（全ヒント一致）:")
-    for coord in solution_tiles:
-        print(f"  → {coord}")
+from utils.debug_utils import find_solution_tiles
 
 
 def main():
@@ -61,7 +39,8 @@ def main():
     engine.state.set_phase("active")
     engine.state.current_action = None
 
-    find_solution_tile(engine)  # デバッグ：正解候補探索
+    sol = find_solution_tiles(engine)  # デバッグ：正解候補探索
+    print(f"[DEBUG] 正解マス:", sol)
 
     # 🖼️ TkinterウィンドウとUIの初期化
     bg_color = "gray15"
@@ -119,14 +98,19 @@ def main():
     button_frame = tk.Frame(inner_wrapper, bg=bg_color)
     button_frame.pack()
 
+    def set_buttons_enabled(enabled=True):
+        """
+        質問／探索ボタンの有効／無効を制御
+        """
+        state = tk.NORMAL if enabled else tk.DISABLED
+        question_btn.config(state=state)
+        search_btn.config(state=state)
+
     def set_phase(phase_type):
         """
         行動フェーズを設定するコールバック（質問／探索）
         - キューブ配置中は制限あり
         """
-        if engine.state.current_action == "place_cube":
-            messagebox.showwarning("無効な操作", "キューブ配置フェーズ中は行動変更できません")
-            return
 
         engine.state.current_action = phase_type
         handler.update_turn_label()
@@ -174,6 +158,8 @@ def main():
     handler = PhaseHandler(engine, canvas, root, turn_label,
                            terrain_imgs, radius, rows, cols,
                            renderer, update_labels=update_player_labels)
+    handler.enable_buttons = lambda: set_buttons_enabled(True)
+    handler.disable_buttons = lambda: set_buttons_enabled(False)
 
     # 🖱️ マスクリック処理（座標変換 → フェーズ処理へ委譲）
     def on_click(event):

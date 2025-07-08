@@ -31,6 +31,8 @@ class PhaseHandler:
         self.renderer = renderer            # BoardRenderer インスタンス
         self.update_labels = update_labels  # プレイヤーラベル更新用のコールバック関数
         self.pending_dialog = None          # 質問対象選択中かどうか
+        self.enable_buttons = None  # ボタン有効化関数（main.pyから注入）
+        self.disable_buttons = None  # ボタン無効化関数
 
     def handle_click(self, coord):
         """
@@ -79,6 +81,9 @@ class PhaseHandler:
         質問対象を選ぶUIポップアップ。
         選択すると _evaluate_question() に渡して処理を継続。
         """
+        if self.disable_buttons:
+            self.disable_buttons()
+
         selector = tk.Toplevel(self.root)
         self.pending_dialog = selector
         selector.title("質問相手を選択")
@@ -100,6 +105,8 @@ class PhaseHandler:
             self.engine.state.current_action = None
             self.engine.state.set_phase("active")
             self.update_turn_label()
+            if self.enable_buttons:
+                self.enable_buttons()
             selector.destroy()
 
         def confirm():
@@ -108,6 +115,9 @@ class PhaseHandler:
             pid = next(k for k, v in self.engine.label_map.items()
                        if v == label)
             target = self.engine.get_player_by_id(pid)
+            if self.enable_buttons:
+                self.enable_buttons()
+
             selector.destroy()
             self.pending_dialog = None
             self._evaluate_question(current, target, cell, coord)
@@ -138,6 +148,9 @@ class PhaseHandler:
             self.update_turn_label()
             self.engine.state.log(
                 f"{asker.display_name} → {target.display_name}: 非合致 → キューブ配置へ")
+
+            if self.disable_buttons:
+                self.disable_buttons()
 
         self.renderer.render(self.engine.board.tiles, self.rows, self.cols)
 
@@ -183,12 +196,18 @@ class PhaseHandler:
             self.engine.state.exploration_target = coord
             self.update_turn_label()
             self.engine.state.log(f"{current.display_name}: 既にディスク済 → 再配置")
+
+            if self.disable_buttons:
+                self.disable_buttons()
             return
 
         # 探索者のディスク配置
         self.engine.board.place_disc(coord, current.id)
         current.add_disc()
         self.engine.state.log(f"{current.display_name}: 探索対象にディスク配置")
+
+        if self.disable_buttons:
+            self.disable_buttons()
 
         # 探索順のプレイヤー並び（探索者 → 左隣から順）
         responder_ids = [current.id] + self._player_order_from(current.id)
@@ -208,6 +227,9 @@ class PhaseHandler:
 
         self.update_turn_label()
         self.renderer.render(self.engine.board.tiles, self.rows, self.cols)
+
+        if self.enable_buttons:
+            self.enable_buttons()
 
     def update_turn_label(self):
         """
@@ -256,6 +278,8 @@ class PhaseHandler:
                 state.current_action = None
                 self.turn_label.config(text="探索成功！", fg=current.color)
                 self.renderer.render(board.tiles, self.rows, self.cols)
+                if self.enable_buttons:
+                    self.enable_buttons()
                 messagebox.showinfo("勝利！", f"{current.display_name} の勝利！")
                 return
 
@@ -275,6 +299,9 @@ class PhaseHandler:
                 board.place_cube(coord, pid)
                 player.add_cube()
                 state.log(f"{player.display_name}: 非合致 → キューブ配置 → 探索終了")
+
+                if self.disable_buttons:
+                    self.disable_buttons()
 
                 # 🔁 探索者がキューブを別マスに配置するフェーズへ
                 state.current_action = "place_cube"

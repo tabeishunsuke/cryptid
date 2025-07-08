@@ -1,5 +1,5 @@
 import math
-from ui.canvas_utils import (
+from utils.canvas_utils import (
     draw_regular_polygon,
     grid_to_pixel,
     is_point_in_polygon
