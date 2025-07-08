@@ -45,7 +45,7 @@ def main():
     hint_loader = HintLoader()
 
     # 使用マップIDとプレイヤー数を指定
-    map_id = map_loader.get_available_map_ids()[10]
+    map_id = map_loader.get_available_map_ids()[15]
     player_count = 5
     board_data = map_loader.load_map(map_id)
 

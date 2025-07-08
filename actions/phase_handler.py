@@ -216,6 +216,11 @@ class PhaseHandler:
             messagebox.showwarning("無効", "既にキューブが置かれているため探索できません")
             return
 
+        # ✅ 自分のヒントが探索対象マスに合致しているか確認
+        if not HintEvaluator.hint_applies(cell, current.hint, self.engine.board.tiles):
+            messagebox.showwarning("探索不可", "自分のヒントに合致しないマスは探索できません")
+            return
+
         board = self.engine.board
         state = self.engine.state
         current_pid = current.id
