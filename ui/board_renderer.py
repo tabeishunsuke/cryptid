@@ -34,8 +34,14 @@ class BoardRenderer:
             terrain = cell.get("terrain", "")
             terrain_img = self.terrain_imgs.get(terrain)
 
+            fill_color = ""  # デフォルトの背景色
+            outline = "white"
+
             if terrain_img:
                 self.canvas.create_image(x, y, image=terrain_img)
+
+            draw_regular_polygon(self.canvas, x, y, self.radius,
+                                 6, fill_color=fill_color, outline_color=outline, outline_width=3)
 
             for territory in cell.get("territories", []):
                 self._draw_territory(x, y, territory)
@@ -74,25 +80,27 @@ class BoardRenderer:
                     ex = p_start[0] + qx * r1
                     ey = p_start[1] + qy * r1
                     self.canvas.create_line(
-                        sx, sy, ex, ey, fill="black", width=1)
+                        sx, sy, ex, ey, fill="black", width=2.1)
 
         elif territory_type == "eagle":
             flat_points = [coord for pt in vertices for coord in pt]
             self.canvas.create_polygon(
-                flat_points, outline="red", fill="", width=2)
+                flat_points, outline="red", fill="", width=2.1)
 
     def _draw_structure(self, x, y, type_, color):
-        r = 16
+        r = 25
         if type_ == "ruin":
-            draw_regular_polygon(self.canvas, x, y, r, 3, fill_color=color)
+            draw_regular_polygon(self.canvas, x, y, r, 3,
+                                 fill_color=color, outline_color="")
         elif type_ == "stone":
-            draw_regular_polygon(self.canvas, x, y, r, 8, fill_color=color)
+            draw_regular_polygon(self.canvas, x, y, r, 8,
+                                 fill_color=color, outline_color="")
 
     def _draw_disc(self, x, y, player_id, offset=0, total_discs=1):
         player = self.player_lookup.get(player_id)
         color = getattr(player, 'color', "gray")
 
-        r = 8
+        r = 10
         diameter = r * 2
 
         # 横幅全体を計算し、中央基準で左から配置
@@ -103,8 +111,7 @@ class BoardRenderer:
 
         self.canvas.create_oval(
             disc_x - r, disc_y - r, disc_x + r, disc_y + r,
-            fill=color, outline="black"
-        )
+            fill=color, outline="")
 
     def _draw_cube(self, x, y, player_id):
         player = self.player_lookup.get(player_id)
@@ -112,11 +119,10 @@ class BoardRenderer:
             print(f"[WARN] player_id {player_id} → 色不明（grayで描画）")
         color = getattr(player, 'color', "gray")
 
-        r = 10
+        r = 15
         self.canvas.create_rectangle(
             x - r, y + 5 - r, x + r, y + 5 + r,
-            fill=color, outline="black"
-        )
+            fill=color, outline="")
 
     def highlight_cell(self, coord):
         """ホバーしているマスに黄色の透明六角形を描画"""

@@ -61,7 +61,7 @@ def grid_to_pixel(col, row, radius, margin_x=0, margin_y=0):
     return x, y
 
 
-def draw_regular_polygon(canvas, x, y, radius, vertex, fill_color):
+def draw_regular_polygon(canvas, x, y, radius, vertex, fill_color, outline_color="black", outline_width=1):
     """
     正多角形を描画するユーティリティ関数
     - canvas: TkinterのCanvasオブジェクト
@@ -83,4 +83,5 @@ def draw_regular_polygon(canvas, x, y, radius, vertex, fill_color):
         py = y + radius * math.sin(angle)
         points.extend([px, py])
 
-    canvas.create_polygon(points, fill=fill_color)
+    canvas.create_polygon(points, fill=fill_color,
+                          outline=outline_color, width=outline_width)
