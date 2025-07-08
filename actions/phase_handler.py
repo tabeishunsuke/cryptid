@@ -243,10 +243,10 @@ class PhaseHandler:
         phase_map = {
             "question": "質問フェーズ",
             "search": "探索フェーズ",
-            "place_disc": "ディスク配置フェーズ",
-            "place_cube": "キューブ配置フェーズ"
+            "place_disc": "ディスクを置いてください",
+            "place_cube": "【失敗】キューブを置いてください"
         }
-        label_text = f"{label} - {phase_map.get(action, 'ターン')}"
+        label_text = f"{label} - {phase_map.get(action, '行動を選択してください')}"
         self.turn_label.config(text=label_text, fg=color)
 
     def _player_order_from(self, start_pid):

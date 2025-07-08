@@ -183,7 +183,7 @@ def main():
 
     # 🧠 初期ターン表示
     pid = engine.state.current_player
-    turn_label.config(text=f"{label_map[pid]} のターン",
+    turn_label.config(text=f"{label_map[pid]} 行動を選択してください",
                       fg=engine.id_to_player[pid].color)
     update_player_labels()
 
