@@ -37,7 +37,7 @@ class HintEvaluator:
         """
         coord = (match["col"], match["row"])
         for (cx, cy), other in board_data.items():
-            if target(other) and HintEvaluator.hex_distance(coord, (cx, cy)) <= distance:
+            if other is not None and target(other) and HintEvaluator.hex_distance(coord, (cx, cy)) <= distance:
                 return True
         return False
 
@@ -53,61 +53,82 @@ class HintEvaluator:
 
         # 地形2択（大文字小文字考慮）
         if hint_type == "terrain_choice":
-            return cell.get("terrain", "").lower() in [p1.lower(), p2.lower()]
+            terrain = cell.get("terrain", "")
+            return isinstance(terrain, str) and terrain.lower() in [p1.lower(), p2.lower()]
+
         elif hint_type == "neg_terrain_choice":
-            return cell.get("terrain", "").lower() not in [p1.lower(), p2.lower()]
+            terrain = cell.get("terrain", "")
+            return isinstance(terrain, str) and terrain.lower() not in [p1.lower(), p2.lower()]
 
         # 地形近接
         elif hint_type == "adjacent_terrain":
             return HintEvaluator.is_nearby(
-                cell, lambda c: c.get("terrain", "").lower() == p1.lower(),
+                cell,
+                lambda c: isinstance(c, dict) and isinstance(c.get("terrain"), str) and
+                c.get("terrain").lower() == p1.lower(),
                 int(p2), board_data
             )
+
         elif hint_type == "neg_adjacent_terrain":
             return not HintEvaluator.is_nearby(
-                cell, lambda c: c.get("terrain", "").lower() == p1.lower(),
+                cell,
+                lambda c: isinstance(c, dict) and isinstance(c.get("terrain"), str) and
+                c.get("terrain").lower() == p1.lower(),
                 int(p2), board_data
             )
 
-        # 構造物種類または色の近接判定
+        # 構造物の種類による近接
         elif hint_type == "adjacent_structure":
             return HintEvaluator.is_nearby(
-                cell, lambda c: c.get("structure", "").lower() == p1.lower(),
-                int(p2), board_data
-            )
-        elif hint_type == "neg_adjacent_structure":
-            return not HintEvaluator.is_nearby(
-                cell, lambda c: c.get("structure", "").lower() == p1.lower(),
-                int(p2), board_data
-            )
-        elif hint_type == "adjacent_structure_by_color":
-            return HintEvaluator.is_nearby(
-                cell, lambda c: c.get(
-                    "structure_color", "").lower() == p1.lower(),
-                int(p2), board_data
-            )
-        elif hint_type == "neg_adjacent_structure_by_color":
-            return not HintEvaluator.is_nearby(
-                cell, lambda c: c.get(
-                    "structure_color", "").lower() == p1.lower(),
+                cell,
+                lambda c: isinstance(c, dict) and isinstance(c.get("structure"), str) and
+                c.get("structure").lower() == p1.lower(),
                 int(p2), board_data
             )
 
-        # 縄張り近接
+        elif hint_type == "neg_adjacent_structure":
+            return not HintEvaluator.is_nearby(
+                cell,
+                lambda c: isinstance(c, dict) and isinstance(c.get("structure"), str) and
+                c.get("structure").lower() == p1.lower(),
+                int(p2), board_data
+            )
+
+        # 構造物の色による近接
+        elif hint_type == "adjacent_structure_by_color":
+            return HintEvaluator.is_nearby(
+                cell,
+                lambda c: isinstance(c, dict) and isinstance(c.get("structure_color"), str) and
+                c.get("structure_color").lower() == p1.lower(),
+                int(p2), board_data
+            )
+
+        elif hint_type == "neg_adjacent_structure_by_color":
+            return not HintEvaluator.is_nearby(
+                cell,
+                lambda c: isinstance(c, dict) and isinstance(c.get("structure_color"), str) and
+                c.get("structure_color").lower() == p1.lower(),
+                int(p2), board_data
+            )
+
+        # 縄張りの近接（配列比較）
         elif hint_type == "adjacent_territory":
             targets = [t.strip().lower() for t in p1.split(",")]
             return HintEvaluator.is_nearby(
                 cell,
-                lambda c: any(t in [tt.lower() for tt in c.get("territories", [])]
-                              for t in targets),
+                lambda c: isinstance(c, dict) and isinstance(c.get("territories"), list) and
+                any(t in [tt.lower() for tt in c.get("territories")
+                    if isinstance(tt, str)] for t in targets),
                 int(p2), board_data
             )
+
         elif hint_type == "neg_adjacent_territory":
             targets = [t.strip().lower() for t in p1.split(",")]
             return not HintEvaluator.is_nearby(
                 cell,
-                lambda c: any(t in [tt.lower() for tt in c.get("territories", [])]
-                              for t in targets),
+                lambda c: isinstance(c, dict) and isinstance(c.get("territories"), list) and
+                any(t in [tt.lower() for tt in c.get("territories")
+                    if isinstance(tt, str)] for t in targets),
                 int(p2), board_data
             )
 

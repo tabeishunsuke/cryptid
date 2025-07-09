@@ -33,6 +33,7 @@ class PhaseHandler:
         self.pending_dialog = None          # 質問対象選択中かどうか
         self.enable_buttons = None  # ボタン有効化関数（main.pyから注入）
         self.disable_buttons = None  # ボタン無効化関数
+        self.search_active = False  # 探索中フラグ
 
     def handle_click(self, coord):
         """
@@ -41,6 +42,11 @@ class PhaseHandler:
         - 無効な座標や操作中状態はスキップ
         """
         state = self.engine.state
+
+        # ✅ 探索中は無視（クリック連打による多重探索防止）
+        if self.search_active:
+            print("[DEBUG] 探索中 → クリック無効")
+            return
 
         # 無効なフェーズや選択処理中なら無視
         if state.current_action not in {"question", "search", "place_cube", "place_disc"}:
@@ -183,6 +189,11 @@ class PhaseHandler:
         """
         探索フェーズ：探索者が対象マスにディスクを配置し、他プレイヤーが順に反応
         """
+        # ✅ 多重探索防止
+        if self.search_active:
+            print("[DEBUG] 探索アニメーション中 → 探索不可")
+            return
+
         if cell.get("cube"):
             messagebox.showwarning("無効", "既にキューブがあるため探索できません")
             return
@@ -200,6 +211,9 @@ class PhaseHandler:
             if self.disable_buttons:
                 self.disable_buttons()
             return
+
+        # ✅ 探索開始 → フラグON
+        self.search_active = True
 
         # 探索者のディスク配置
         self.engine.board.place_disc(coord, current.id)
@@ -278,6 +292,10 @@ class PhaseHandler:
                 state.current_action = None
                 self.turn_label.config(text="探索成功！", fg=current.color)
                 self.renderer.render(board.tiles, self.rows, self.cols)
+
+                # ✅ 探索完了 → フラグ解除
+                self.search_active = False
+
                 if self.enable_buttons:
                     self.enable_buttons()
                 messagebox.showinfo("勝利！", f"{current.display_name} の勝利！")
@@ -302,6 +320,9 @@ class PhaseHandler:
 
                 if self.disable_buttons:
                     self.disable_buttons()
+
+                # ✅ 探索失敗 → フラグ解除
+                self.search_active = False
 
                 # 🔁 探索者がキューブを別マスに配置するフェーズへ
                 state.current_action = "place_cube"
