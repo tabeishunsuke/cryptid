@@ -1,3 +1,4 @@
+import random
 import tkinter as tk
 from tkinter import messagebox
 from core.map_config_loader import MapConfigLoader
@@ -16,7 +17,8 @@ def main():
     hint_loader = HintLoader()
 
     # 🎲 使用マップとプレイヤー数の指定
-    map_id = map_loader.get_available_map_ids()[15]
+    map_id = map_loader.get_available_map_ids()
+    map_id = random.choice(map_id)
     player_count = 5
     board_data = map_loader.load_map(map_id)
     raw_players = hint_loader.get_players_for_map(map_id, player_count)

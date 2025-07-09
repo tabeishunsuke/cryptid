@@ -22,7 +22,7 @@ map_id,col,row,type,color
 
 3,2,1,stone,blue
 3,4,1,ruin,blue
-3,11,4,ruin,green
+3,11,4,stone,green
 3,3,5,ruin,white
 3,0,6,ruin,green
 3,1,8,stone,white
@@ -99,7 +99,7 @@ map_id,col,row,type,color
 
 14,2,0,stone,white
 14,10,2,stone,green
-14,9,3,ruine,white
+14,9,3,ruin,white
 14,4,5,stone,blue
 14,6,6,ruin,green
 14,3,8,ruin,blue
