@@ -4,13 +4,13 @@
 
 # 環境
 ［言語］
-Python
+Python  
 ［主な使用ライブラリ］
-tkinter
+tkinter  
 [実行方法]
 ```
 python main.py
-```
+```  
 
 データベースは使用せず、ログ出力や対戦結果の保存は行わない
 ![alt text](ゲーム画面.png)
